@@ -1,0 +1,91 @@
+"""Structured logging setup using structlog.
+
+Configures JSON logging for production and colored console for development.
+"""
+
+import logging
+import sys
+from typing import Literal
+
+import structlog
+
+
+def configure_logging(
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO",
+    json_format: bool = False,
+) -> None:
+    """Configure structlog for the application.
+
+    Args:
+        level: Log level (DEBUG, INFO, WARNING, ERROR).
+        json_format: If True, output JSON. If False, colored console.
+    """
+    # Shared processors
+    shared_processors: list[structlog.typing.Processor] = [
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.CallsiteParameterAdder(
+            {
+                structlog.processors.CallsiteParameter.FILENAME,
+                structlog.processors.CallsiteParameter.FUNC_NAME,
+                structlog.processors.CallsiteParameter.LINENO,
+            }
+        ),
+    ]
+
+    if json_format:
+        # Production: JSON output
+        renderer: structlog.typing.Processor = structlog.processors.JSONRenderer()
+    else:
+        # Development: Colored console output
+        renderer = structlog.dev.ConsoleRenderer(colors=True)
+
+    structlog.configure(
+        processors=[
+            *shared_processors,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    # Configure stdlib logging
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=shared_processors,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
+    )
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, level))
+
+    # Suppress noisy loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
+
+
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+    """Get a bound logger instance.
+
+    Args:
+        name: Logger name (typically __name__).
+
+    Returns:
+        Configured structlog bound logger.
+    """
+    return structlog.get_logger(name)  # type: ignore[no-any-return]
