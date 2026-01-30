@@ -42,7 +42,11 @@ class EnrichmentError(SIOPVError):
     """Error during context enrichment (RAG)."""
 
 
-class APIClientError(EnrichmentError):
+class ExternalAPIError(EnrichmentError):
+    """Base error for external API operations."""
+
+
+class APIClientError(ExternalAPIError):
     """External API call failed."""
 
     def __init__(

@@ -94,10 +94,27 @@ class LayerInfo(BaseModel):
         )
 
 
+from siopv.domain.value_objects.enrichment import (
+    CVSSVector,
+    EnrichmentData,
+    EPSSScore,
+    GitHubAdvisory,
+    NVDEnrichment,
+    OSINTResult,
+)
+
 __all__ = [
+    # Phase 1 - Ingestion
     "CVEId",
     "CVSSScore",
     "LayerInfo",
     "PackageVersion",
     "SeverityLevel",
+    # Phase 2 - Enrichment
+    "CVSSVector",
+    "EnrichmentData",
+    "EPSSScore",
+    "GitHubAdvisory",
+    "NVDEnrichment",
+    "OSINTResult",
 ]
