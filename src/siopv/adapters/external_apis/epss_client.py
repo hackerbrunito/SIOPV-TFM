@@ -8,7 +8,7 @@ API Documentation: https://www.first.org/epss/api
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import httpx
 import structlog
@@ -27,12 +27,10 @@ from siopv.infrastructure.resilience import (
     CircuitBreakerError,
     create_epss_rate_limiter,
 )
+from siopv.infrastructure.types import JsonDict
 
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
-
-# Type alias for JSON response data
-JsonDict = dict[str, Any]
 
 logger = structlog.get_logger(__name__)
 

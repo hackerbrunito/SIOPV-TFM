@@ -153,6 +153,10 @@ def get_escalation_summary(state: PipelineState) -> dict[str, object]:
         escalated_details.append(detail)
 
     # Sort by discrepancy (highest first)
+    # Note: type ignores needed because dict value type is `object` but we know
+    # "discrepancy" is float|None at runtime. Two separate issues:
+    # - arg-type: lambda signature doesn't match expected Callable
+    # - return-value: returning object instead of SupportsDunderLT
     escalated_details.sort(
         key=lambda x: x["discrepancy"] if x["discrepancy"] is not None else 0,  # type: ignore[arg-type, return-value]
         reverse=True,
