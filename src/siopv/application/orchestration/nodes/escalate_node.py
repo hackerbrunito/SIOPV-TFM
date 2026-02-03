@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def escalate_node(state: PipelineState) -> dict:
+def escalate_node(state: PipelineState) -> dict[str, object]:
     """Execute escalation phase as a LangGraph node.
 
     This node handles CVEs that require human review due to:
@@ -51,7 +51,7 @@ def escalate_node(state: PipelineState) -> dict:
 
     try:
         # Identify CVEs requiring escalation
-        escalated = _identify_escalation_candidates(classifications, llm_confidence)
+        escalated = _identify_escalation_candidates(classifications, llm_confidence)  # type: ignore[arg-type]
 
         logger.info(
             "escalate_node_complete",
@@ -95,8 +95,8 @@ def escalate_node(state: PipelineState) -> dict:
 
 
 def _identify_escalation_candidates(
-    classifications: dict,
-    llm_confidence: dict,
+    classifications: dict[str, object],
+    llm_confidence: dict[str, float],
 ) -> list[str]:
     """Identify CVEs that should be escalated to human review.
 
@@ -117,7 +117,7 @@ def _identify_escalation_candidates(
     return escalated
 
 
-def get_escalation_summary(state: PipelineState) -> dict:
+def get_escalation_summary(state: PipelineState) -> dict[str, object]:
     """Generate a summary of escalated CVEs for dashboard display.
 
     Args:
@@ -130,20 +130,13 @@ def get_escalation_summary(state: PipelineState) -> dict:
     classifications = state.get("classifications", {})
     llm_confidence = state.get("llm_confidence", {})
 
-    summary = {
-        "total_escalated": len(escalated_cves),
-        "total_processed": len(classifications),
-        "escalation_rate": len(escalated_cves) / len(classifications) * 100
-        if classifications
-        else 0,
-        "escalated_details": [],
-    }
+    escalated_details: list[dict[str, object]] = []
 
     for cve_id in escalated_cves:
         classification = classifications.get(cve_id)
         confidence = llm_confidence.get(cve_id, 0.0)
 
-        detail = {
+        detail: dict[str, object] = {
             "cve_id": cve_id,
             "llm_confidence": confidence,
             "ml_score": None,
@@ -157,13 +150,22 @@ def get_escalation_summary(state: PipelineState) -> dict:
             detail["risk_label"] = classification.risk_score.risk_label
             detail["discrepancy"] = abs(ml_score - confidence)
 
-        summary["escalated_details"].append(detail)
+        escalated_details.append(detail)
 
     # Sort by discrepancy (highest first)
-    summary["escalated_details"].sort(
-        key=lambda x: x["discrepancy"] if x["discrepancy"] is not None else 0,
+    escalated_details.sort(
+        key=lambda x: x["discrepancy"] if x["discrepancy"] is not None else 0,  # type: ignore[arg-type, return-value]
         reverse=True,
     )
+
+    summary: dict[str, object] = {
+        "total_escalated": len(escalated_cves),
+        "total_processed": len(classifications),
+        "escalation_rate": len(escalated_cves) / len(classifications) * 100
+        if classifications
+        else 0,
+        "escalated_details": escalated_details,
+    }
 
     return summary
 

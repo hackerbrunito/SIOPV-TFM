@@ -215,6 +215,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         X = np.vstack([fv.to_array().reshape(1, -1) for fv in feature_vectors])
 
         # Get probabilities
+        if self._model is None:
+            msg = "Model not loaded"
+            raise RuntimeError(msg)
         probabilities = self._model.predict_proba(X)[:, 1]
 
         # Get SHAP explanations
@@ -245,6 +248,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         self._ensure_model_loaded()
 
         X = feature_vector.to_array().reshape(1, -1)
+        if self._model is None:
+            msg = "Model not loaded"
+            raise RuntimeError(msg)
         proba = self._model.predict_proba(X)[0, 1]
 
         return float(proba)
@@ -262,7 +268,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
     def get_feature_importance(self) -> dict[str, float]:
         """Get global feature importance from the model."""
         self._ensure_model_loaded()
-
+        if self._model is None:
+            msg = "Model not loaded"
+            raise RuntimeError(msg)
         importances = self._model.feature_importances_
         return dict(zip(self._feature_names, importances.tolist(), strict=True))
 
@@ -270,7 +278,7 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         """Check if model is loaded and ready."""
         return self._model is not None
 
-    def get_training_metadata(self) -> dict:
+    def get_training_metadata(self) -> dict[str, object]:
         """Get metadata about training for audit purposes.
 
         Returns:
@@ -406,7 +414,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
 
         X_array = np.vstack([fv.to_array().reshape(1, -1) for fv in X])
         y_array = np.array(y)
-
+        if self._model is None:
+            msg = "Model not loaded"
+            raise RuntimeError(msg)
         y_pred = self._model.predict(X_array)
         y_proba = self._model.predict_proba(X_array)[:, 1]
 
@@ -432,6 +442,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         save_path = Path(path)
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if self._model is None:
+            msg = "Model not loaded"
+            raise RuntimeError(msg)
         self._model.save_model(str(save_path))
         logger.info("model_saved", path=str(save_path))
 
@@ -463,6 +476,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
     def _get_shap_explainer(self) -> SHAPExplainer:
         """Get or create SHAP explainer."""
         if self._shap_explainer is None:
+            if self._model is None:
+                msg = "Model not loaded"
+                raise RuntimeError(msg)
             self._shap_explainer = SHAPExplainer(
                 model=self._model,
                 feature_names=self._feature_names,
@@ -472,6 +488,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
     def _get_lime_explainer(self) -> LIMEExplainer:
         """Get or create LIME explainer."""
         if self._lime_explainer is None:
+            if self._model is None:
+                msg = "Model not loaded"
+                raise RuntimeError(msg)
             # Get random state for LIME (M-03 fix)
             random_state = self._get_training_random_state()
             self._lime_explainer = LIMEExplainer.from_model(
@@ -482,7 +501,7 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
             )
         return self._lime_explainer
 
-    def _default_params(self) -> dict:
+    def _default_params(self) -> dict[str, object]:
         """Return default XGBoost parameters."""
         return {
             "n_estimators": 100,
@@ -506,7 +525,7 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         *,
         n_trials: int = 50,
         random_state: int,
-    ) -> dict:
+    ) -> dict[str, object]:
         """Optimize hyperparameters using Optuna.
 
         Args:

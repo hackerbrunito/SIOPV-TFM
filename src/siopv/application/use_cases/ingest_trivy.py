@@ -76,7 +76,7 @@ class IngestTrivyReportUseCase:
         raw_records = self._parser.parse_file(path)
         return self._build_result(raw_records, log_completion=True)
 
-    def execute_from_dict(self, data: dict) -> IngestionResult:
+    def execute_from_dict(self, data: dict[str, object]) -> IngestionResult:
         """Execute ingestion from a dictionary (already parsed JSON).
 
         Useful for testing or when JSON is received via API.

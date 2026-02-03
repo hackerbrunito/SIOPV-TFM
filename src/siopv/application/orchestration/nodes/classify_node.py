@@ -22,7 +22,7 @@ def classify_node(
     state: PipelineState,
     *,
     classifier: MLClassifierPort | None = None,
-) -> dict:
+) -> dict[str, object]:
     """Execute classification phase as a LangGraph node.
 
     This node wraps the ClassifyRiskUseCase to integrate with
@@ -61,12 +61,13 @@ def classify_node(
                 reason="no_classifier_provided",
             )
             classifications, llm_confidence = _create_mock_classifications(
-                vulnerabilities, enrichments
+                vulnerabilities,  # type: ignore[arg-type]
+                enrichments,  # type: ignore[arg-type]
             )
         else:
             classifications, llm_confidence = _run_classification(
-                vulnerabilities=vulnerabilities,
-                enrichments=enrichments,
+                vulnerabilities=vulnerabilities,  # type: ignore[arg-type]
+                enrichments=enrichments,  # type: ignore[arg-type]
                 classifier=classifier,
             )
 
@@ -94,10 +95,10 @@ def classify_node(
 
 
 def _run_classification(
-    vulnerabilities: list,
-    enrichments: dict,
+    vulnerabilities: list[object],
+    enrichments: dict[str, object],
     classifier: MLClassifierPort,
-) -> tuple[dict, dict]:
+) -> tuple[dict[str, object], dict[str, object]]:
     """Run classification using ClassifyRiskUseCase.
 
     Args:
@@ -114,7 +115,7 @@ def _run_classification(
 
     use_case = ClassifyRiskUseCase(classifier=classifier)
 
-    result = use_case.execute_batch(vulnerabilities, enrichments)
+    result = use_case.execute_batch(vulnerabilities, enrichments)  # type: ignore[arg-type]
 
     # Convert results to dictionaries
     classifications: dict[str, ClassificationResult] = {}
@@ -129,10 +130,11 @@ def _run_classification(
         # In production, this would come from actual LLM evaluation
         if classification_result.risk_score is not None:
             llm_confidence[cve_id] = _estimate_llm_confidence(
-                classification_result, enrichments.get(cve_id)
+                classification_result,
+                enrichments.get(cve_id),  # type: ignore[arg-type]
             )
 
-    return classifications, llm_confidence
+    return classifications, llm_confidence  # type: ignore[return-value]
 
 
 def _estimate_llm_confidence(
@@ -177,9 +179,9 @@ def _estimate_llm_confidence(
 
 
 def _create_mock_classifications(
-    vulnerabilities: list,
-    enrichments: dict,
-) -> tuple[dict, dict]:
+    vulnerabilities: list[object],
+    enrichments: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
     """Create mock classifications when classifier is unavailable.
 
     This provides basic classification structure for testing or
@@ -200,7 +202,7 @@ def _create_mock_classifications(
     llm_confidence: dict[str, float] = {}
 
     for vuln in vulnerabilities:
-        cve_id = vuln.cve_id.value
+        cve_id = vuln.cve_id.value  # type: ignore[attr-defined]
 
         # Estimate risk based on severity
         severity_risk_map = {
@@ -210,7 +212,7 @@ def _create_mock_classifications(
             "LOW": 0.3,
             "UNKNOWN": 0.4,
         }
-        risk_probability = severity_risk_map.get(vuln.severity, 0.4)
+        risk_probability = severity_risk_map.get(vuln.severity, 0.4)  # type: ignore[attr-defined]
 
         # Create mock risk score using factory method
         mock_risk_score = RiskScore.from_prediction(
@@ -226,7 +228,7 @@ def _create_mock_classifications(
         # Mock LLM confidence based on severity certainty
         llm_confidence[cve_id] = 0.6 + (risk_probability * 0.3)
 
-    return classifications, llm_confidence
+    return classifications, llm_confidence  # type: ignore[return-value]
 
 
 __all__ = [

@@ -10,7 +10,7 @@ These represent enriched context from external sources:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -38,7 +38,7 @@ class EPSSScore(BaseModel):
     )
 
     @classmethod
-    def from_api_response(cls, data: dict) -> EPSSScore:
+    def from_api_response(cls, data: dict[str, str]) -> EPSSScore:
         """Create EPSSScore from FIRST EPSS API response.
 
         Args:
@@ -204,7 +204,7 @@ class NVDEnrichment(BaseModel):
     )
 
     @classmethod
-    def from_nvd_response(cls, data: dict) -> NVDEnrichment:
+    def from_nvd_response(cls, data: dict[str, Any]) -> NVDEnrichment:
         """Create NVDEnrichment from NVD API 2.0 response.
 
         Args:
@@ -304,7 +304,7 @@ class GitHubAdvisory(BaseModel):
     package_name: str | None = Field(default=None, description="Affected package name")
 
     @classmethod
-    def from_graphql_response(cls, data: dict) -> GitHubAdvisory:
+    def from_graphql_response(cls, data: dict[str, Any]) -> GitHubAdvisory:
         """Create GitHubAdvisory from GitHub GraphQL API response.
 
         Args:
@@ -372,7 +372,7 @@ class OSINTResult(BaseModel):
     published_date: str | None = Field(default=None)
 
     @classmethod
-    def from_tavily_result(cls, data: dict) -> OSINTResult:
+    def from_tavily_result(cls, data: dict[str, Any]) -> OSINTResult:
         """Create OSINTResult from Tavily API response item."""
         return cls(
             title=data.get("title", ""),

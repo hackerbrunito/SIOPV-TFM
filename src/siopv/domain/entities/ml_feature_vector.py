@@ -103,13 +103,13 @@ class MLFeatureVector(BaseModel):
 
     @field_validator("attack_vector", "attack_complexity", mode="before")
     @classmethod
-    def coerce_int(cls, v) -> int:
+    def coerce_int(cls, v: int | float) -> int:
         """Coerce numeric values to int."""
         if isinstance(v, float):
             return int(v)
         return v
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def feature_names(self) -> list[str]:
         """Return ordered list of feature names for ML model."""

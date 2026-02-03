@@ -188,7 +188,7 @@ class CircuitBreaker:
         """Async context manager exit - record success or failure."""
         if exc_val is None:
             await self._record_success()
-        elif not isinstance(exc_val, CircuitBreakerError):
+        elif not isinstance(exc_val, CircuitBreakerError) and isinstance(exc_val, Exception):
             await self._record_failure(exc_val)
         return False  # Don't suppress exceptions
 
@@ -202,7 +202,7 @@ class CircuitBreaker:
         """
 
         @wraps(func)
-        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:  # type: ignore[return]
             async with self:
                 return await func(*args, **kwargs)
 
@@ -216,8 +216,9 @@ class CircuitBreaker:
         self._half_open_calls = 0
         logger.info("circuit_breaker_reset", service=self.service_name)
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, object]:
         """Get circuit breaker statistics."""
+        retry_time = self._time_until_retry()
         return {
             "service": self.service_name,
             "state": self.state.value,
@@ -226,9 +227,7 @@ class CircuitBreaker:
             "last_failure": self._last_failure_time.isoformat()
             if self._last_failure_time
             else None,
-            "time_until_retry": self._time_until_retry().total_seconds()
-            if self._time_until_retry()
-            else None,
+            "time_until_retry": retry_time.total_seconds() if retry_time is not None else None,
         }
 
 

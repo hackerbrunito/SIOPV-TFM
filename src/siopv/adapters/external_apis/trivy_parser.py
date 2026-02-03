@@ -67,7 +67,7 @@ class TrivyParser:
 
         return self.parse_dict(data)
 
-    def parse_dict(self, data: dict) -> list[VulnerabilityRecord]:
+    def parse_dict(self, data: dict[str, object]) -> list[VulnerabilityRecord]:
         """Parse a Trivy report from a dictionary.
 
         Args:
@@ -113,7 +113,7 @@ class TrivyParser:
 
         return records
 
-    def _iterate_vulnerabilities(self, data: dict) -> Iterator[VulnerabilityRecord]:
+    def _iterate_vulnerabilities(self, data: dict[str, object]) -> Iterator[VulnerabilityRecord]:
         """Iterate over all vulnerabilities in the report.
 
         Args:
@@ -124,7 +124,7 @@ class TrivyParser:
         """
         results = data.get("Results", [])
 
-        for result in results:
+        for result in results:  # type: ignore[attr-defined]
             target = result.get("Target", "")
             vulnerabilities = result.get("Vulnerabilities", [])
 

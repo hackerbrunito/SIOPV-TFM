@@ -58,8 +58,8 @@ def should_escalate_cve(
 
 
 def calculate_escalation_candidates(
-    classifications: dict,
-    llm_confidence: dict,
+    classifications: dict[str, object],
+    llm_confidence: dict[str, float],
     *,
     config: ThresholdConfig | None = None,
     history: DiscrepancyHistory | None = None,
@@ -90,10 +90,10 @@ def calculate_escalation_candidates(
     # First pass: calculate all discrepancies and populate history
     discrepancies: dict[str, float] = {}
     for cve_id, classification in classifications.items():
-        if classification.risk_score is None:
+        if classification.risk_score is None:  # type: ignore[attr-defined]
             continue
 
-        ml_score = classification.risk_score.risk_probability
+        ml_score = classification.risk_score.risk_probability  # type: ignore[attr-defined]
         confidence = llm_confidence.get(cve_id, 0.5)
         discrepancy = abs(ml_score - confidence)
 
@@ -115,8 +115,8 @@ def calculate_escalation_candidates(
     escalated: list[str] = []
     for cve_id, classification in classifications.items():
         ml_score = (
-            classification.risk_score.risk_probability
-            if classification.risk_score is not None
+            classification.risk_score.risk_probability  # type: ignore[attr-defined]
+            if classification.risk_score is not None  # type: ignore[attr-defined]
             else None
         )
         confidence = llm_confidence.get(cve_id, 0.5)
@@ -133,8 +133,8 @@ def calculate_escalation_candidates(
 
 
 def check_any_escalation_needed(
-    classifications: dict,
-    llm_confidence: dict,
+    classifications: dict[str, object],
+    llm_confidence: dict[str, float],
     *,
     config: ThresholdConfig | None = None,
 ) -> bool:
@@ -157,8 +157,8 @@ def check_any_escalation_needed(
 
     for cve_id, classification in classifications.items():
         ml_score = (
-            classification.risk_score.risk_probability
-            if classification.risk_score is not None
+            classification.risk_score.risk_probability  # type: ignore[attr-defined]
+            if classification.risk_score is not None  # type: ignore[attr-defined]
             else None
         )
         confidence = llm_confidence.get(cve_id, 0.5)

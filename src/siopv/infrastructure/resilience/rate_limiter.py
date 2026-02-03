@@ -145,7 +145,7 @@ class RateLimiter:
             asyncio.PriorityQueue(maxsize=max_queue_size)
         )
         self._lock = asyncio.Lock()
-        self._queue_processor_task: asyncio.Task | None = None
+        self._queue_processor_task: asyncio.Task[None] | None = None
 
         logger.debug(
             "rate_limiter_initialized",
@@ -238,7 +238,7 @@ class RateLimiter:
 
         return wrapper
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, object]:
         """Get rate limiter statistics."""
         return {
             "service": self.service_name,

@@ -123,8 +123,8 @@ class PipelineGraphBuilder:
         self._vector_store = vector_store
         self._classifier = classifier
 
-        self._graph: StateGraph | None = None
-        self._compiled: CompiledStateGraph | None = None
+        self._graph: StateGraph[PipelineState] | None = None
+        self._compiled: CompiledStateGraph[PipelineState] | None = None
 
     def build(self) -> PipelineGraphBuilder:
         """Build the StateGraph with all nodes and edges.
@@ -212,7 +212,7 @@ class PipelineGraphBuilder:
 
         logger.debug("pipeline_edges_added")
 
-    def compile(self, *, with_checkpointer: bool = True) -> CompiledStateGraph:
+    def compile(self, *, with_checkpointer: bool = True) -> CompiledStateGraph[PipelineState]:
         """Compile the graph with optional checkpointing.
 
         Args:
@@ -245,16 +245,16 @@ class PipelineGraphBuilder:
                 db_path=str(db_path),
             )
 
-        self._compiled = self._graph.compile(checkpointer=checkpointer)
+        self._compiled = self._graph.compile(checkpointer=checkpointer)  # type: ignore[assignment]
 
         logger.info(
             "pipeline_graph_compiled",
             with_checkpointer=with_checkpointer,
         )
 
-        return self._compiled
+        return self._compiled  # type: ignore[return-value]
 
-    def get_compiled(self) -> CompiledStateGraph:
+    def get_compiled(self) -> CompiledStateGraph[PipelineState]:
         """Get the compiled graph, compiling if necessary.
 
         Returns:
@@ -310,7 +310,7 @@ def create_pipeline_graph(
     vector_store: VectorStorePort | None = None,
     classifier: MLClassifierPort | None = None,
     with_checkpointer: bool = True,
-) -> CompiledStateGraph:
+) -> CompiledStateGraph[PipelineState]:
     """Factory function to create and compile the pipeline graph.
 
     Args:
@@ -382,7 +382,7 @@ def run_pipeline(
     )
 
     # Execute pipeline
-    result = graph.invoke(initial_state, config)
+    result = graph.invoke(initial_state, config)  # type: ignore[arg-type]
 
     logger.info(
         "pipeline_execution_complete",
@@ -393,7 +393,7 @@ def run_pipeline(
         error_count=len(result.get("errors", [])),
     )
 
-    return result
+    return result  # type: ignore[return-value]
 
 
 __all__ = [

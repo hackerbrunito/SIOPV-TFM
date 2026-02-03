@@ -284,7 +284,7 @@ class CISAKEVLoader(DatasetLoaderPort):
 
         return []
 
-    def get_kev_details(self, cve_id: str) -> dict | None:
+    def get_kev_details(self, cve_id: str) -> dict[str, object] | None:
         """Get detailed KEV information for a CVE.
 
         Args:
@@ -302,7 +302,7 @@ class CISAKEVLoader(DatasetLoaderPort):
 
         return None
 
-    def get_kev_stats(self) -> dict:
+    def get_kev_stats(self) -> dict[str, object]:
         """Get statistics about the KEV catalog.
 
         Returns:

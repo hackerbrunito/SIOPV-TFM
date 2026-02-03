@@ -38,7 +38,7 @@ class SHAPValues(BaseModel):
 
     @field_validator("shap_values")
     @classmethod
-    def validate_shap_values(cls, v: list[float], info) -> list[float]:
+    def validate_shap_values(cls, v: list[float], info: object) -> list[float]:
         """Validate SHAP values have same length as feature names."""
         return v
 

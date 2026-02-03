@@ -8,7 +8,7 @@ API Documentation: https://docs.github.com/en/graphql/reference/objects#security
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -30,6 +30,9 @@ from siopv.infrastructure.resilience import (
 
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
+
+# Type alias for JSON response data
+JsonDict = dict[str, Any]
 
 logger = structlog.get_logger(__name__)
 
@@ -198,7 +201,7 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    async def _execute_graphql(self, query: str, variables: dict) -> dict:
+    async def _execute_graphql(self, query: str, variables: dict[str, Any]) -> JsonDict:
         """Execute GraphQL query with retry logic.
 
         Args:
@@ -240,7 +243,8 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
             logger.error("github_graphql_error", error=error_msg)
             raise GitHubAdvisoryClientError(f"GraphQL error: {error_msg}")
 
-        return data.get("data", {})
+        result: JsonDict = data.get("data", {})
+        return result
 
     async def get_advisory_by_cve(self, cve_id: str) -> GitHubAdvisory | None:
         """Fetch GitHub Security Advisory for a CVE.

@@ -9,7 +9,7 @@ API Documentation: https://nvd.nist.gov/developers/vulnerabilities
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -32,12 +32,14 @@ from siopv.infrastructure.resilience import (
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
 
+# Type alias for JSON response data
+JsonDict = dict[str, Any]
+
 logger = structlog.get_logger(__name__)
 
 
 class NVDClientError(ExternalAPIError):
     """Error from NVD API operations."""
-
 
 
 class NVDClient(NVDClientPort):
@@ -120,7 +122,7 @@ class NVDClient(NVDClientPort):
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    async def _fetch_cve(self, cve_id: str) -> dict | None:
+    async def _fetch_cve(self, cve_id: str) -> JsonDict | None:
         """Fetch CVE data from NVD API with retry logic.
 
         Args:
@@ -150,13 +152,14 @@ class NVDClient(NVDClientPort):
 
         response.raise_for_status()
 
-        data = response.json()
-        vulnerabilities = data.get("vulnerabilities", [])
+        data: JsonDict = response.json()
+        vulnerabilities: list[JsonDict] = data.get("vulnerabilities", [])
 
         if not vulnerabilities:
             return None
 
-        return vulnerabilities[0]
+        result: JsonDict = vulnerabilities[0]
+        return result
 
     async def get_cve(self, cve_id: str) -> NVDEnrichment | None:
         """Fetch CVE details from NVD API.

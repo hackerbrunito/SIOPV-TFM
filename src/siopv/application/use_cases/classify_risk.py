@@ -221,7 +221,7 @@ class ClassifyRiskUseCase:
     def get_risk_summary(
         self,
         results: list[ClassificationResult],
-    ) -> dict:
+    ) -> dict[str, object]:
         """Generate a summary of classification results.
 
         Args:

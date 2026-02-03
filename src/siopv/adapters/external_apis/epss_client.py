@@ -8,7 +8,7 @@ API Documentation: https://www.first.org/epss/api
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -30,6 +30,9 @@ from siopv.infrastructure.resilience import (
 
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
+
+# Type alias for JSON response data
+JsonDict = dict[str, Any]
 
 logger = structlog.get_logger(__name__)
 
@@ -108,7 +111,7 @@ class EPSSClient(EPSSClientPort):
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    async def _fetch_epss(self, cve_id: str) -> dict | None:
+    async def _fetch_epss(self, cve_id: str) -> JsonDict | None:
         """Fetch EPSS data from API with retry logic.
 
         Args:
@@ -125,14 +128,15 @@ class EPSSClient(EPSSClientPort):
         response = await client.get(url)
         response.raise_for_status()
 
-        data = response.json()
-        epss_data = data.get("data", [])
+        data: JsonDict = response.json()
+        epss_data: list[JsonDict] = data.get("data", [])
 
         if not epss_data:
             logger.debug("epss_cve_not_found", cve_id=cve_id)
             return None
 
-        return epss_data[0]
+        result: JsonDict = epss_data[0]
+        return result
 
     async def get_score(self, cve_id: str) -> EPSSScore | None:
         """Fetch EPSS score for a CVE.
@@ -197,7 +201,7 @@ class EPSSClient(EPSSClientPort):
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    async def _fetch_epss_batch(self, cve_ids: list[str]) -> list[dict]:
+    async def _fetch_epss_batch(self, cve_ids: list[str]) -> list[JsonDict]:
         """Fetch EPSS data for multiple CVEs in a single request.
 
         The EPSS API supports comma-separated CVE IDs for batch queries.
@@ -218,8 +222,9 @@ class EPSSClient(EPSSClientPort):
         response = await client.get(url)
         response.raise_for_status()
 
-        data = response.json()
-        return data.get("data", [])
+        data: JsonDict = response.json()
+        result: list[JsonDict] = data.get("data", [])
+        return result
 
     async def get_scores_batch(self, cve_ids: list[str]) -> dict[str, EPSSScore | None]:
         """Fetch EPSS scores for multiple CVEs.
@@ -261,11 +266,11 @@ class EPSSClient(EPSSClientPort):
 
                     # Process results
                     for item in epss_data:
-                        cve_id = item.get("cve")
-                        if cve_id:
+                        cve_id_value: str | None = item.get("cve")
+                        if cve_id_value:
                             score = EPSSScore.from_api_response(item)
-                            self._cache[cve_id] = score
-                            results[cve_id] = score
+                            self._cache[cve_id_value] = score
+                            results[cve_id_value] = score
 
             logger.info(
                 "epss_batch_complete",

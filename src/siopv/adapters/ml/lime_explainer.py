@@ -196,7 +196,7 @@ class LIMEExplainer:
     @classmethod
     def from_model(
         cls,
-        model,
+        model: object,
         feature_names: list[str],
         training_data: np.ndarray | None = None,
         *,
@@ -216,7 +216,8 @@ class LIMEExplainer:
 
         def predict_fn(X: np.ndarray) -> np.ndarray:
             """Wrapper for model's predict_proba."""
-            return model.predict_proba(X)
+            result: np.ndarray = model.predict_proba(X)  # type: ignore[attr-defined]
+            return result
 
         return cls(
             predict_fn=predict_fn,

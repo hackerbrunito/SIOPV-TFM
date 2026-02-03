@@ -8,7 +8,7 @@ API Documentation: https://docs.tavily.com/
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import structlog
@@ -30,6 +30,9 @@ from siopv.infrastructure.resilience import (
 
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
+
+# Type alias for JSON response data
+JsonDict = dict[str, Any]
 
 logger = structlog.get_logger(__name__)
 
@@ -129,7 +132,7 @@ class TavilyClient(OSINTSearchClientPort):
         max_results: int = 5,
         search_depth: str = "basic",
         include_domains: list[str] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, object]]:
         """Execute Tavily search with retry logic.
 
         Args:
@@ -147,7 +150,7 @@ class TavilyClient(OSINTSearchClientPort):
 
         client = await self._get_client()
 
-        payload = {
+        payload: JsonDict = {
             "api_key": self._api_key,
             "query": query,
             "max_results": max_results,
@@ -177,7 +180,8 @@ class TavilyClient(OSINTSearchClientPort):
         response.raise_for_status()
 
         data = response.json()
-        return data.get("results", [])
+        results: list[dict[str, object]] = data.get("results", [])
+        return results
 
     async def search(
         self,

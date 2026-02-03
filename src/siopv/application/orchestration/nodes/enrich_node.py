@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         OSINTSearchClientPort,
         VectorStorePort,
     )
+    from siopv.domain.value_objects import EnrichmentData
 
 logger = structlog.get_logger(__name__)
 
@@ -32,7 +33,7 @@ def enrich_node(
     osint_client: OSINTSearchClientPort | None = None,
     vector_store: VectorStorePort | None = None,
     max_concurrent: int = 5,
-) -> dict:
+) -> dict[str, object]:
     """Execute enrichment phase as a LangGraph node.
 
     This node wraps the EnrichContextUseCase to integrate with
@@ -69,7 +70,7 @@ def enrich_node(
         # Run async enrichment in sync context
         enrichments = asyncio.run(
             _run_enrichment(
-                vulnerabilities=vulnerabilities,
+                vulnerabilities=vulnerabilities,  # type: ignore[arg-type]
                 nvd_client=nvd_client,
                 epss_client=epss_client,
                 github_client=github_client,
@@ -101,14 +102,14 @@ def enrich_node(
 
 
 async def _run_enrichment(
-    vulnerabilities: list,
+    vulnerabilities: list[object],
     nvd_client: NVDClientPort | None,
     epss_client: EPSSClientPort | None,
     github_client: GitHubAdvisoryClientPort | None,
     osint_client: OSINTSearchClientPort | None,
     vector_store: VectorStorePort | None,
     max_concurrent: int,
-) -> dict:
+) -> dict[str, object]:
     """Run async enrichment using EnrichContextUseCase.
 
     Args:
@@ -124,7 +125,6 @@ async def _run_enrichment(
         Dictionary mapping CVE ID to EnrichmentData
     """
     from siopv.application.use_cases.enrich_context import EnrichContextUseCase
-    from siopv.domain.value_objects import EnrichmentData
 
     # If clients are not provided, return minimal enrichments
     # This allows the node to work in test/mock scenarios
@@ -139,15 +139,15 @@ async def _run_enrichment(
         return _create_minimal_enrichments(vulnerabilities)
 
     use_case = EnrichContextUseCase(
-        nvd_client=nvd_client,
-        epss_client=epss_client,
-        github_client=github_client,
-        osint_client=osint_client,
-        vector_store=vector_store,
+        nvd_client=nvd_client,  # type: ignore[arg-type]
+        epss_client=epss_client,  # type: ignore[arg-type]
+        github_client=github_client,  # type: ignore[arg-type]
+        osint_client=osint_client,  # type: ignore[arg-type]
+        vector_store=vector_store,  # type: ignore[arg-type]
     )
 
     result = await use_case.execute_batch(
-        vulnerabilities,
+        vulnerabilities,  # type: ignore[arg-type]
         max_concurrent=max_concurrent,
     )
 
@@ -157,10 +157,10 @@ async def _run_enrichment(
         if enrichment_result.enrichment is not None:
             enrichments[enrichment_result.cve_id] = enrichment_result.enrichment
 
-    return enrichments
+    return enrichments  # type: ignore[return-value]
 
 
-def _create_minimal_enrichments(vulnerabilities: list) -> dict:
+def _create_minimal_enrichments(vulnerabilities: list[object]) -> dict[str, object]:
     """Create minimal enrichment data when clients are unavailable.
 
     This provides basic enrichment structure for testing or
@@ -176,13 +176,13 @@ def _create_minimal_enrichments(vulnerabilities: list) -> dict:
 
     enrichments = {}
     for vuln in vulnerabilities:
-        cve_id = vuln.cve_id.value
+        cve_id = vuln.cve_id.value  # type: ignore[attr-defined]
         enrichments[cve_id] = EnrichmentData(
             cve_id=cve_id,
             relevance_score=0.5,  # Default relevance
         )
 
-    return enrichments
+    return enrichments  # type: ignore[return-value]
 
 
 async def enrich_node_async(
@@ -194,7 +194,7 @@ async def enrich_node_async(
     osint_client: OSINTSearchClientPort | None = None,
     vector_store: VectorStorePort | None = None,
     max_concurrent: int = 5,
-) -> dict:
+) -> dict[str, object]:
     """Async version of enrich_node for use in async contexts.
 
     Args:
@@ -226,7 +226,7 @@ async def enrich_node_async(
 
     try:
         enrichments = await _run_enrichment(
-            vulnerabilities=vulnerabilities,
+            vulnerabilities=vulnerabilities,  # type: ignore[arg-type]
             nvd_client=nvd_client,
             epss_client=epss_client,
             github_client=github_client,

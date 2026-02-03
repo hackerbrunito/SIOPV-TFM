@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def ingest_node(state: PipelineState) -> dict:
+def ingest_node(state: PipelineState) -> dict[str, object]:
     """Execute ingestion phase as a LangGraph node.
 
     This node wraps the IngestTrivyReportUseCase to integrate with
@@ -83,7 +83,9 @@ def ingest_node(state: PipelineState) -> dict:
         }
 
 
-def ingest_node_from_dict(state: PipelineState, report_data: dict) -> dict:
+def ingest_node_from_dict(
+    state: PipelineState, report_data: dict[str, object]
+) -> dict[str, object]:
     """Execute ingestion from a dictionary (for API/testing).
 
     Alternative entry point when the report is already parsed JSON.

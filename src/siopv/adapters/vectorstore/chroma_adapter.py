@@ -18,7 +18,6 @@ from siopv.application.ports import VectorStorePort
 from siopv.domain.value_objects import EnrichmentData
 
 if TYPE_CHECKING:
-    import chromadb
     from chromadb.api.models.Collection import Collection
 
     from siopv.infrastructure.config import Settings
@@ -83,7 +82,7 @@ class ChromaDBAdapter(VectorStorePort):
         self,
         settings: Settings,
         *,
-        client: chromadb.ClientAPI | None = None,
+        client: object | None = None,
     ):
         """Initialize ChromaDB adapter.
 
@@ -100,7 +99,7 @@ class ChromaDBAdapter(VectorStorePort):
         self._cache = LRUCache(max_size=estimated_items)
 
         self._external_client = client
-        self._owned_client: chromadb.ClientAPI | None = None
+        self._owned_client: object | None = None
         self._collection: Collection | None = None
 
         logger.info(
@@ -110,7 +109,7 @@ class ChromaDBAdapter(VectorStorePort):
             cache_items=estimated_items,
         )
 
-    def _get_client(self) -> chromadb.ClientAPI:
+    def _get_client(self) -> object:
         """Get or create ChromaDB client."""
         if self._external_client:
             return self._external_client
@@ -134,7 +133,7 @@ class ChromaDBAdapter(VectorStorePort):
             client = self._get_client()
 
             # Get or create collection (Context7 verified pattern)
-            self._collection = client.get_or_create_collection(
+            self._collection = client.get_or_create_collection(  # type: ignore[attr-defined]
                 name=self._collection_name,
                 metadata={"description": "SIOPV vulnerability enrichment data"},
             )
@@ -147,7 +146,7 @@ class ChromaDBAdapter(VectorStorePort):
 
         return self._collection
 
-    def _enrichment_to_document(self, enrichment: EnrichmentData) -> dict:
+    def _enrichment_to_document(self, enrichment: EnrichmentData) -> dict[str, object]:
         """Convert EnrichmentData to ChromaDB document format.
 
         Args:
@@ -178,7 +177,7 @@ class ChromaDBAdapter(VectorStorePort):
             "metadata": metadata,
         }
 
-    def _document_to_enrichment(self, metadata: dict) -> EnrichmentData:
+    def _document_to_enrichment(self, metadata: dict[str, object]) -> EnrichmentData:
         """Reconstruct EnrichmentData from ChromaDB metadata.
 
         Args:
@@ -187,7 +186,7 @@ class ChromaDBAdapter(VectorStorePort):
         Returns:
             EnrichmentData instance
         """
-        full_data = json.loads(metadata["full_data"])
+        full_data = json.loads(metadata["full_data"])  # type: ignore[arg-type]
         return EnrichmentData.model_validate(full_data)
 
     async def store_enrichment(self, enrichment: EnrichmentData) -> str:
@@ -204,16 +203,16 @@ class ChromaDBAdapter(VectorStorePort):
 
         # Upsert to handle duplicates
         collection.upsert(
-            ids=[doc["id"]],
-            documents=[doc["document"]],
-            metadatas=[doc["metadata"]],
+            ids=[doc["id"]],  # type: ignore[list-item]
+            documents=[doc["document"]],  # type: ignore[list-item]
+            metadatas=[doc["metadata"]],  # type: ignore[list-item]
         )
 
         # Update cache
         self._cache.put(enrichment.cve_id, enrichment)
 
         logger.debug("chromadb_enrichment_stored", cve_id=enrichment.cve_id)
-        return doc["id"]
+        return doc["id"]  # type: ignore[return-value]
 
     async def store_enrichments_batch(self, enrichments: list[EnrichmentData]) -> list[str]:
         """Store multiple enrichments efficiently.
@@ -244,13 +243,13 @@ class ChromaDBAdapter(VectorStorePort):
 
         # Batch upsert
         collection.upsert(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas,
+            ids=ids,  # type: ignore[arg-type]
+            documents=documents,  # type: ignore[arg-type]
+            metadatas=metadatas,  # type: ignore[arg-type]
         )
 
         logger.info("chromadb_batch_stored", count=len(enrichments))
-        return ids
+        return ids  # type: ignore[return-value]
 
     async def query_similar(
         self,
@@ -289,7 +288,7 @@ class ChromaDBAdapter(VectorStorePort):
                 similarity = 1.0 / (1.0 + distance)
 
                 if similarity >= min_relevance:
-                    enrichment = self._document_to_enrichment(metadata)
+                    enrichment = self._document_to_enrichment(metadata)  # type: ignore[arg-type]
                     enrichments_with_scores.append((enrichment, similarity))
 
         logger.debug(
@@ -323,7 +322,7 @@ class ChromaDBAdapter(VectorStorePort):
 
         if results["metadatas"] and results["metadatas"][0]:
             metadata = results["metadatas"][0]
-            enrichment = self._document_to_enrichment(metadata)
+            enrichment = self._document_to_enrichment(metadata)  # type: ignore[arg-type]
 
             # Update cache
             self._cache.put(cve_id, enrichment)
@@ -392,7 +391,7 @@ class ChromaDBAdapter(VectorStorePort):
         client = self._get_client()
 
         # Delete and recreate collection
-        client.delete_collection(self._collection_name)
+        client.delete_collection(self._collection_name)  # type: ignore[attr-defined]
         self._collection = None
 
         # Clear cache
@@ -400,7 +399,7 @@ class ChromaDBAdapter(VectorStorePort):
 
         logger.warning("chromadb_collection_cleared", name=self._collection_name)
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, object]:
         """Get adapter statistics."""
         collection = self._get_collection()
         return {

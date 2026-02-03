@@ -153,7 +153,7 @@ class ModelPersistence:
 
     def save_model_with_metadata(
         self,
-        model,
+        model: object,
         model_name: str,
         *,
         version: str = "1.0.0",
@@ -188,7 +188,7 @@ class ModelPersistence:
 
         # Save model
         model_path = model_dir / "model.json"
-        model.save_model(str(model_path))
+        model.save_model(str(model_path))  # type: ignore[attr-defined]
 
         # Compute model hash (M-01 fix)
         model_hash = _compute_file_hash(model_path)
@@ -229,12 +229,12 @@ class ModelPersistence:
 
     def load_model_with_metadata(
         self,
-        model_class,
+        model_class: type[Any],
         model_name: str,
         version: str | None = None,
         *,
         verify_integrity: bool = True,
-    ) -> tuple[Any, dict]:
+    ) -> tuple[Any, dict[str, Any]]:
         """Load model with associated metadata and verify integrity.
 
         Args:

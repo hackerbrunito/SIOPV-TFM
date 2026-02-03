@@ -257,12 +257,12 @@ class EnrichContextUseCase:
         )
 
         return EnrichmentSources(
-            nvd=nvd_result,
-            epss=epss_result,
-            github=github_result,
+            nvd=nvd_result,  # type: ignore[arg-type]
+            epss=epss_result,  # type: ignore[arg-type]
+            github=github_result,  # type: ignore[arg-type]
         )
 
-    async def _safe_fetch(self, coro, source_name: str):
+    async def _safe_fetch(self, coro: object, source_name: str) -> object:
         """Execute fetch with error handling.
 
         Args:
@@ -273,7 +273,7 @@ class EnrichContextUseCase:
             Result or None on error
         """
         try:
-            return await coro
+            return await coro  # type: ignore[misc]
         except Exception as e:
             logger.warning("enrichment_source_error", source=source_name, error=str(e))
             return None

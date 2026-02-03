@@ -84,7 +84,7 @@ class LayerInfo(BaseModel):
     diff_id: str | None = Field(default=None, description="Layer diff ID")
 
     @classmethod
-    def from_trivy(cls, layer_data: dict | None) -> LayerInfo | None:
+    def from_trivy(cls, layer_data: dict[str, str] | None) -> LayerInfo | None:
         """Create LayerInfo from Trivy layer data."""
         if not layer_data:
             return None

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -62,7 +62,9 @@ class VulnerabilityRecord(BaseModel):
         return v
 
     @classmethod
-    def from_trivy(cls, vuln_data: dict, target: str | None = None) -> VulnerabilityRecord:
+    def from_trivy(
+        cls, vuln_data: dict[str, Any], target: str | None = None
+    ) -> VulnerabilityRecord:
         """Create VulnerabilityRecord from Trivy vulnerability data.
 
         Args:

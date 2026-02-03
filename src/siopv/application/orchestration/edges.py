@@ -24,7 +24,7 @@ logger = structlog.get_logger(__name__)
 RouteType = Literal["escalate", "continue", "end"]
 
 
-def should_escalate_route(state: dict) -> RouteType:
+def should_escalate_route(state: dict[str, object]) -> RouteType:
     """Determine routing based on uncertainty trigger logic.
 
     Implements the adaptive threshold from spec section 3.4:
@@ -46,7 +46,7 @@ def should_escalate_route(state: dict) -> RouteType:
         return "end"
 
     # Check if any CVE requires escalation
-    needs_escalation = _check_escalation_needed(classifications, llm_confidence)
+    needs_escalation = _check_escalation_needed(classifications, llm_confidence)  # type: ignore[arg-type]
 
     if needs_escalation:
         logger.info(
@@ -60,8 +60,8 @@ def should_escalate_route(state: dict) -> RouteType:
 
 
 def _check_escalation_needed(
-    classifications: dict,
-    llm_confidence: dict,
+    classifications: dict[str, object],
+    llm_confidence: dict[str, object],
 ) -> bool:
     """Check if any CVE requires escalation based on uncertainty.
 
@@ -74,7 +74,7 @@ def _check_escalation_needed(
     """
     from siopv.application.orchestration.utils import check_any_escalation_needed
 
-    return check_any_escalation_needed(classifications, llm_confidence)
+    return check_any_escalation_needed(classifications, llm_confidence)  # type: ignore[arg-type]
 
 
 def calculate_discrepancy(
@@ -115,8 +115,8 @@ def calculate_discrepancy(
 
 
 def calculate_batch_discrepancies(
-    classifications: dict,
-    llm_confidence: dict,
+    classifications: dict[str, object],
+    llm_confidence: dict[str, object],
     *,
     history: DiscrepancyHistory | None = None,
     config: ThresholdConfig | None = None,
@@ -142,20 +142,20 @@ def calculate_batch_discrepancies(
 
     # First pass: calculate all discrepancies and update history
     for cve_id, classification in classifications.items():
-        if classification.risk_score is None:
+        if classification.risk_score is None:  # type: ignore[attr-defined]
             # Handle missing scores
             results.append(
                 DiscrepancyResult(
                     cve_id=cve_id,
                     ml_score=0.0,
-                    llm_confidence=llm_confidence.get(cve_id, 0.5),
+                    llm_confidence=llm_confidence.get(cve_id, 0.5),  # type: ignore[arg-type]
                     discrepancy=1.0,  # Maximum uncertainty
                     should_escalate=True,
                 )
             )
             continue
 
-        ml_score = classification.risk_score.risk_probability
+        ml_score = classification.risk_score.risk_probability  # type: ignore[attr-defined]
         confidence = llm_confidence.get(cve_id, 0.5)
         discrepancy = abs(ml_score - confidence)
 
@@ -174,17 +174,17 @@ def calculate_batch_discrepancies(
     # Second pass: determine escalation with adaptive threshold
     final_results: list[DiscrepancyResult] = []
     for cve_id, classification in classifications.items():
-        if classification.risk_score is None:
+        if classification.risk_score is None:  # type: ignore[attr-defined]
             # Already handled above
             continue
 
-        ml_score = classification.risk_score.risk_probability
+        ml_score = classification.risk_score.risk_probability  # type: ignore[attr-defined]
         confidence = llm_confidence.get(cve_id, 0.5)
 
         result = calculate_discrepancy(
             cve_id=cve_id,
             ml_score=ml_score,
-            llm_confidence=confidence,
+            llm_confidence=confidence,  # type: ignore[arg-type]
             threshold=adaptive_threshold,
             config=config,
         )
@@ -193,7 +193,7 @@ def calculate_batch_discrepancies(
     return final_results, adaptive_threshold
 
 
-def route_after_classify(state: dict) -> RouteType:
+def route_after_classify(state: dict[str, object]) -> RouteType:
     """Route after classification node based on results.
 
     Simple routing logic:
@@ -212,7 +212,7 @@ def route_after_classify(state: dict) -> RouteType:
     if errors:
         logger.warning(
             "routing_to_end_due_to_errors",
-            error_count=len(errors),
+            error_count=len(errors),  # type: ignore[arg-type]
         )
         return "end"
 
@@ -223,7 +223,7 @@ def route_after_classify(state: dict) -> RouteType:
     return should_escalate_route(state)
 
 
-def route_after_escalate(state: dict) -> Literal["end"]:
+def route_after_escalate(state: dict[str, object]) -> Literal["end"]:
     """Route after escalation node.
 
     After escalation, the pipeline proceeds to end.
@@ -236,7 +236,7 @@ def route_after_escalate(state: dict) -> Literal["end"]:
     Returns:
         Always returns "end"
     """
-    escalated_count = len(state.get("escalated_cves", []))
+    escalated_count = len(state.get("escalated_cves", []))  # type: ignore[arg-type]
     logger.info(
         "routing_to_end_after_escalate",
         escalated_count=escalated_count,
