@@ -1,5 +1,17 @@
 """Application use cases for SIOPV."""
 
+from siopv.application.use_cases.authorization import (
+    AuthorizationStats,
+    BatchCheckAuthorizationUseCase,
+    BatchCheckResult,
+    CheckAuthorizationResult,
+    CheckAuthorizationUseCase,
+    ManageRelationshipsUseCase,
+    RelationshipWriteResult,
+    create_batch_check_authorization_use_case,
+    create_check_authorization_use_case,
+    create_manage_relationships_use_case,
+)
 from siopv.application.use_cases.classify_risk import (
     BatchClassificationResult,
     ClassificationResult,
@@ -41,4 +53,15 @@ __all__ = [
     "ClassificationStats",
     "ClassifyRiskUseCase",
     "create_classify_risk_use_case",
+    # Phase 5 - Authorization
+    "AuthorizationStats",
+    "BatchCheckAuthorizationUseCase",
+    "BatchCheckResult",
+    "CheckAuthorizationResult",
+    "CheckAuthorizationUseCase",
+    "ManageRelationshipsUseCase",
+    "RelationshipWriteResult",
+    "create_batch_check_authorization_use_case",
+    "create_check_authorization_use_case",
+    "create_manage_relationships_use_case",
 ]
