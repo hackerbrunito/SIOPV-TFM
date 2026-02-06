@@ -1,0 +1,140 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2026-02-06T10:00:00Z",
+  "ArtifactName": "siopv-enterprise:v2.0.0",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {"Family": "debian", "Name": "12.4"}
+  },
+  "Results": [
+    {
+      "Target": "siopv-enterprise:v2.0.0 (debian 12.4)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2023-44487", "PkgName": "libnghttp2-14", "InstalledVersion": "1.52.0-1", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-4911", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Score": 7.8}}},
+        {"VulnerabilityID": "CVE-2023-45853", "PkgName": "zlib1g", "InstalledVersion": "1.2.13", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Score": 9.8}}},
+        {"VulnerabilityID": "CVE-2024-0567", "PkgName": "libgnutls30", "InstalledVersion": "3.7.9-2", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2023-50387", "PkgName": "libsystemd0", "InstalledVersion": "252.17-1", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-2961", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.8}}},
+        {"VulnerabilityID": "CVE-2023-52425", "PkgName": "libexpat1", "InstalledVersion": "2.5.0-1", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-7104", "PkgName": "libsqlite3-0", "InstalledVersion": "3.40.1-2", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.3}}},
+        {"VulnerabilityID": "CVE-2024-24806", "PkgName": "libuv1", "InstalledVersion": "1.44.2-1", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.3}}},
+        {"VulnerabilityID": "CVE-2023-39804", "PkgName": "tar", "InstalledVersion": "1.34", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 3.3}}},
+        {"VulnerabilityID": "CVE-2024-28182", "PkgName": "libnghttp2-14", "InstalledVersion": "1.52.0-1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2023-6129", "PkgName": "libssl3", "InstalledVersion": "3.0.11-1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2023-6237", "PkgName": "libssl3", "InstalledVersion": "3.0.11-1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2024-0727", "PkgName": "libssl3", "InstalledVersion": "3.0.11-1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2023-52426", "PkgName": "libexpat1", "InstalledVersion": "2.5.0-1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2023-4806", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2023-4527", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2023-4813", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2023-5156", "PkgName": "libc6", "InstalledVersion": "2.36-9", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2023-29383", "PkgName": "login", "InstalledVersion": "4.13", "Severity": "LOW", "CVSS": {"nvd": {"V3Score": 3.3}}},
+        {"VulnerabilityID": "CVE-2024-2379", "PkgName": "curl", "InstalledVersion": "7.88.1-10", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 4.3}}},
+        {"VulnerabilityID": "CVE-2024-2398", "PkgName": "curl", "InstalledVersion": "7.88.1-10", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2024-2004", "PkgName": "curl", "InstalledVersion": "7.88.1-10", "Severity": "LOW", "CVSS": {"nvd": {"V3Score": 3.7}}},
+        {"VulnerabilityID": "CVE-2023-28322", "PkgName": "curl", "InstalledVersion": "7.88.1-10", "Severity": "LOW", "CVSS": {"nvd": {"V3Score": 3.7}}},
+        {"VulnerabilityID": "CVE-2023-38546", "PkgName": "curl", "InstalledVersion": "7.88.1-10", "Severity": "LOW", "CVSS": {"nvd": {"V3Score": 3.7}}}
+      ]
+    },
+    {
+      "Target": "Python",
+      "Class": "lang-pkgs",
+      "Type": "pip",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-3651", "PkgName": "idna", "InstalledVersion": "3.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-35195", "PkgName": "requests", "InstalledVersion": "2.31.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 3.1}}},
+        {"VulnerabilityID": "CVE-2023-49083", "PkgName": "cryptography", "InstalledVersion": "41.0.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2024-26130", "PkgName": "cryptography", "InstalledVersion": "41.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-0450", "PkgName": "pillow", "InstalledVersion": "10.0.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2023-50447", "PkgName": "pillow", "InstalledVersion": "10.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.1}}},
+        {"VulnerabilityID": "CVE-2024-28219", "PkgName": "pillow", "InstalledVersion": "10.0.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2023-45803", "PkgName": "urllib3", "InstalledVersion": "2.0.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 4.2}}},
+        {"VulnerabilityID": "CVE-2024-37891", "PkgName": "urllib3", "InstalledVersion": "2.0.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 4.4}}},
+        {"VulnerabilityID": "CVE-2023-43804", "PkgName": "urllib3", "InstalledVersion": "2.0.4", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.1}}},
+        {"VulnerabilityID": "CVE-2024-22195", "PkgName": "jinja2", "InstalledVersion": "3.1.2", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.1}}},
+        {"VulnerabilityID": "CVE-2024-34064", "PkgName": "jinja2", "InstalledVersion": "3.1.2", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.4}}},
+        {"VulnerabilityID": "CVE-2024-6345", "PkgName": "setuptools", "InstalledVersion": "68.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.8}}},
+        {"VulnerabilityID": "CVE-2024-3772", "PkgName": "pydantic", "InstalledVersion": "2.5.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-27306", "PkgName": "aiohttp", "InstalledVersion": "3.9.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.1}}},
+        {"VulnerabilityID": "CVE-2024-23334", "PkgName": "aiohttp", "InstalledVersion": "3.9.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-23829", "PkgName": "aiohttp", "InstalledVersion": "3.9.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-30251", "PkgName": "aiohttp", "InstalledVersion": "3.9.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-46136", "PkgName": "werkzeug", "InstalledVersion": "3.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-34069", "PkgName": "werkzeug", "InstalledVersion": "3.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-1135", "PkgName": "gunicorn", "InstalledVersion": "21.0.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-39689", "PkgName": "certifi", "InstalledVersion": "2023.7.22", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-0727", "PkgName": "pyopenssl", "InstalledVersion": "23.2.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2024-24762", "PkgName": "fastapi", "InstalledVersion": "0.109.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-24783", "PkgName": "starlette", "InstalledVersion": "0.35.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}}
+      ]
+    },
+    {
+      "Target": "requirements.txt",
+      "Class": "lang-pkgs",
+      "Type": "pip",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-41110", "PkgName": "docker", "InstalledVersion": "6.1.0", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Score": 9.9}}},
+        {"VulnerabilityID": "CVE-2024-5569", "PkgName": "zipp", "InstalledVersion": "3.15.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2024-6923", "PkgName": "python", "InstalledVersion": "3.11.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2024-7592", "PkgName": "python", "InstalledVersion": "3.11.4", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-8088", "PkgName": "python", "InstalledVersion": "3.11.4", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-4030", "PkgName": "python", "InstalledVersion": "3.11.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2024-0397", "PkgName": "python", "InstalledVersion": "3.11.4", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.4}}}
+      ]
+    },
+    {
+      "Target": "Node.js",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-21538", "PkgName": "cross-spawn", "InstalledVersion": "7.0.3", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-4068", "PkgName": "braces", "InstalledVersion": "3.0.2", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-29041", "PkgName": "express", "InstalledVersion": "4.18.2", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.1}}},
+        {"VulnerabilityID": "CVE-2024-28849", "PkgName": "follow-redirects", "InstalledVersion": "1.15.4", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.5}}},
+        {"VulnerabilityID": "CVE-2024-37168", "PkgName": "@grpc/grpc-js", "InstalledVersion": "1.9.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-45296", "PkgName": "path-to-regexp", "InstalledVersion": "0.1.7", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-45590", "PkgName": "body-parser", "InstalledVersion": "1.20.1", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2024-43800", "PkgName": "serve-static", "InstalledVersion": "1.15.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.0}}},
+        {"VulnerabilityID": "CVE-2024-43799", "PkgName": "send", "InstalledVersion": "0.18.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.0}}},
+        {"VulnerabilityID": "CVE-2024-47764", "PkgName": "cookie", "InstalledVersion": "0.5.0", "Severity": "LOW", "CVSS": {"nvd": {"V3Score": 3.1}}}
+      ]
+    },
+    {
+      "Target": "Golang",
+      "Class": "lang-pkgs",
+      "Type": "gomod",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-24790", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Score": 9.8}}},
+        {"VulnerabilityID": "CVE-2024-24789", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2024-24791", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-45288", "PkgName": "golang.org/x/net", "InstalledVersion": "0.17.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-45289", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2023-45290", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-24785", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 6.1}}},
+        {"VulnerabilityID": "CVE-2024-24784", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-24783", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.9}}},
+        {"VulnerabilityID": "CVE-2023-39326", "PkgName": "stdlib", "InstalledVersion": "1.21.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2023-39325", "PkgName": "golang.org/x/net", "InstalledVersion": "0.17.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}},
+        {"VulnerabilityID": "CVE-2023-44487", "PkgName": "golang.org/x/net", "InstalledVersion": "0.17.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.5}}}
+      ]
+    },
+    {
+      "Target": "Java",
+      "Class": "lang-pkgs",
+      "Type": "jar",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2024-22262", "PkgName": "org.springframework:spring-web", "InstalledVersion": "6.1.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.1}}},
+        {"VulnerabilityID": "CVE-2024-22259", "PkgName": "org.springframework:spring-web", "InstalledVersion": "6.1.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.1}}},
+        {"VulnerabilityID": "CVE-2024-22243", "PkgName": "org.springframework:spring-web", "InstalledVersion": "6.1.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.1}}},
+        {"VulnerabilityID": "CVE-2024-38809", "PkgName": "org.springframework:spring-web", "InstalledVersion": "6.1.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-38808", "PkgName": "org.springframework:spring-expression", "InstalledVersion": "6.1.0", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.5}}},
+        {"VulnerabilityID": "CVE-2024-31573", "PkgName": "org.xmlunit:xmlunit-core", "InstalledVersion": "2.9.1", "Severity": "MEDIUM", "CVSS": {"nvd": {"V3Score": 5.3}}},
+        {"VulnerabilityID": "CVE-2024-22257", "PkgName": "org.springframework.security:spring-security-core", "InstalledVersion": "6.2.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 8.2}}},
+        {"VulnerabilityID": "CVE-2024-22234", "PkgName": "org.springframework.security:spring-security-core", "InstalledVersion": "6.2.0", "Severity": "HIGH", "CVSS": {"nvd": {"V3Score": 7.4}}}
+      ]
+    }
+  ]
+}

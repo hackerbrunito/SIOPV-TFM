@@ -85,3 +85,4 @@ Thumbs.db
 *.key
 credentials.json
 secrets.json
+claude-verification-reports/

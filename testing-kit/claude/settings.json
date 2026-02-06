@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(date:*)",
+      "Bash(mkdir:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(tree:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(git:*)",
+      "Bash(sudo:*)"
+    ]
+  }
+}
