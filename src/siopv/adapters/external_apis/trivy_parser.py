@@ -54,7 +54,7 @@ class TrivyParser:
             msg = f"Trivy report file not found: {path}"
             raise TrivyParseError(msg)
 
-        if not path.suffix == ".json":
+        if path.suffix != ".json":
             msg = f"Expected JSON file, got: {path.suffix}"
             raise TrivyParseError(msg)
 

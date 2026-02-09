@@ -9,10 +9,15 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from siopv.application.use_cases.classify_risk import (
+    ClassificationResult,
+    ClassifyRiskUseCase,
+)
+from siopv.domain.value_objects.risk_score import RiskScore
+
 if TYPE_CHECKING:
     from siopv.application.orchestration.state import PipelineState
     from siopv.application.ports.ml_classifier import MLClassifierPort
-    from siopv.application.use_cases.classify_risk import ClassificationResult
     from siopv.domain.value_objects import EnrichmentData
 
 logger = structlog.get_logger(__name__)
@@ -77,19 +82,19 @@ def classify_node(
             total_vulnerabilities=len(vulnerabilities),
         )
 
-        return {
-            "classifications": classifications,
-            "llm_confidence": llm_confidence,
-            "current_node": "classify",
-        }
-
     except Exception as e:
         error_msg = f"Classification failed: {e}"
-        logger.error("classify_node_failed", error=error_msg, exception=str(e))
+        logger.exception("classify_node_failed", error=error_msg, exception=str(e))
         return {
             "classifications": {},
             "llm_confidence": {},
             "errors": [error_msg],
+            "current_node": "classify",
+        }
+    else:
+        return {
+            "classifications": classifications,
+            "llm_confidence": llm_confidence,
             "current_node": "classify",
         }
 
@@ -109,9 +114,6 @@ def _run_classification(
     Returns:
         Tuple of (classifications dict, llm_confidence dict)
     """
-    from siopv.application.use_cases.classify_risk import (
-        ClassifyRiskUseCase,
-    )
 
     use_case = ClassifyRiskUseCase(classifier=classifier)
 
@@ -180,7 +182,7 @@ def _estimate_llm_confidence(
 
 def _create_mock_classifications(
     vulnerabilities: list[object],
-    enrichments: dict[str, object],
+    _enrichments: dict[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Create mock classifications when classifier is unavailable.
 
@@ -189,15 +191,11 @@ def _create_mock_classifications(
 
     Args:
         vulnerabilities: List of VulnerabilityRecord
-        enrichments: Dictionary of enrichments
+        _enrichments: Dictionary of enrichments (unused in mock)
 
     Returns:
         Tuple of (mock classifications dict, mock llm_confidence dict)
     """
-
-    from siopv.application.use_cases.classify_risk import ClassificationResult
-    from siopv.domain.value_objects.risk_score import RiskScore
-
     classifications: dict[str, ClassificationResult] = {}
     llm_confidence: dict[str, float] = {}
 

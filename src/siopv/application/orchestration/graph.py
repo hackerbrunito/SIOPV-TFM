@@ -7,6 +7,7 @@ Based on specification section 3.4.
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,10 +20,12 @@ from siopv.application.orchestration.edges import (
     route_after_escalate,
 )
 from siopv.application.orchestration.nodes import (
+    authorization_node,
     classify_node,
     enrich_node,
     escalate_node,
     ingest_node,
+    route_after_authorization,
 )
 from siopv.application.orchestration.state import PipelineState, create_initial_state
 
@@ -156,7 +159,6 @@ class PipelineGraphBuilder:
 
     def _add_nodes(self) -> None:
         """Add all pipeline nodes to the graph."""
-        from siopv.application.orchestration.nodes import authorization_node
 
         if self._graph is None:
             msg = "Graph not initialized. Call build() first."
@@ -203,7 +205,6 @@ class PipelineGraphBuilder:
 
     def _add_edges(self) -> None:
         """Add all edges and conditional routing to the graph."""
-        from siopv.application.orchestration.nodes import route_after_authorization
 
         if self._graph is None:
             msg = "Graph not initialized. Call build() first."
@@ -404,7 +405,6 @@ def run_pipeline(
     Returns:
         Final pipeline state with all results
     """
-    import uuid
 
     # Create initial state
     initial_state = create_initial_state(

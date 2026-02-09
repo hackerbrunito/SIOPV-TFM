@@ -10,11 +10,13 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from siopv.application.orchestration.state import (
+    DiscrepancyHistory,
+    ThresholdConfig,
+)
+
 if TYPE_CHECKING:
-    from siopv.application.orchestration.state import (
-        DiscrepancyHistory,
-        ThresholdConfig,
-    )
+    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -79,11 +81,6 @@ def calculate_escalation_candidates(
     Returns:
         Tuple of (list of CVE IDs to escalate, adaptive_threshold)
     """
-    from siopv.application.orchestration.state import (
-        DiscrepancyHistory,
-        ThresholdConfig,
-    )
-
     config = config or ThresholdConfig()
     history = history or DiscrepancyHistory()
 
@@ -151,8 +148,6 @@ def check_any_escalation_needed(
     Returns:
         True if any CVE should be escalated
     """
-    from siopv.application.orchestration.state import ThresholdConfig
-
     config = config or ThresholdConfig()
 
     for cve_id, classification in classifications.items():

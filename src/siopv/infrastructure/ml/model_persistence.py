@@ -47,23 +47,28 @@ def _validate_path_component(component: str, component_name: str = "path compone
         PathTraversalError: If component contains unsafe characters
     """
     if not component:
+        msg = f"Empty {component_name} not allowed"
         raise PathTraversalError(
-            f"Empty {component_name} not allowed",
+            msg,
             details={"component_name": component_name},
         )
 
     # Check for path traversal patterns
     if ".." in component or "/" in component or "\\" in component:
+        msg = f"Path traversal attempt detected in {component_name}"
         raise PathTraversalError(
-            f"Path traversal attempt detected in {component_name}",
+            msg,
             details={"component_name": component_name, "value": component},
         )
 
     # Validate against whitelist regex
     if not SAFE_PATH_COMPONENT_REGEX.match(component):
-        raise PathTraversalError(
+        msg = (
             f"Invalid characters in {component_name}. "
-            "Only alphanumeric, dots, underscores, and hyphens allowed.",
+            "Only alphanumeric, dots, underscores, and hyphens allowed."
+        )
+        raise PathTraversalError(
+            msg,
             details={"component_name": component_name, "value": component},
         )
 
@@ -143,8 +148,9 @@ class ModelPersistence:
         """
         resolved = path.resolve()
         if not resolved.is_relative_to(self._base_path):
+            msg = "Path traversal attempt: resolved path escapes base directory"
             raise PathTraversalError(
-                "Path traversal attempt: resolved path escapes base directory",
+                msg,
                 details={
                     "resolved_path": str(resolved),
                     "base_path": str(self._base_path),
@@ -287,8 +293,9 @@ class ModelPersistence:
         # Check file size before loading (M-01 fix)
         file_size = model_path.stat().st_size
         if file_size > self._max_model_size:
+            msg = f"Model file exceeds maximum allowed size ({self._max_model_size} bytes)"
             raise IntegrityError(
-                f"Model file exceeds maximum allowed size ({self._max_model_size} bytes)",
+                msg,
                 details={
                     "file_size": file_size,
                     "max_size": self._max_model_size,
@@ -309,8 +316,9 @@ class ModelPersistence:
             computed_hash = _compute_file_hash(model_path)
 
             if computed_hash != stored_hash:
+                msg = "Model integrity verification failed: hash mismatch"
                 raise IntegrityError(
-                    "Model integrity verification failed: hash mismatch",
+                    msg,
                     details={
                         "stored_hash": stored_hash[:16] + "...",
                         "computed_hash": computed_hash[:16] + "...",
@@ -324,8 +332,9 @@ class ModelPersistence:
                     stored_hash.encode(), self._signing_key
                 )
                 if metadata["model_signature"] != expected_signature:
+                    msg = "Model signature verification failed"
                     raise IntegrityError(
-                        "Model signature verification failed",
+                        msg,
                         details={"model_path": str(model_path)},
                     )
 

@@ -191,7 +191,7 @@ class EnrichContextUseCase:
             )
 
         except Exception as e:
-            logger.error("enrichment_failed", cve_id=cve_id, error=str(e))
+            logger.exception("enrichment_failed", cve_id=cve_id, error=str(e))
             return EnrichmentResult(
                 cve_id=cve_id,
                 enrichment=None,
@@ -299,11 +299,11 @@ class EnrichContextUseCase:
                     search_depth="advanced",
                 )
 
-            return results
-
         except Exception as e:
             logger.warning("osint_fallback_failed", cve_id=cve_id, error=str(e))
             return []
+        else:
+            return results
 
     def _calculate_relevance(self, sources: EnrichmentSources) -> float:
         """Calculate relevance score for retrieved data.

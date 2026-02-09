@@ -36,32 +36,28 @@ from siopv.application.use_cases.ingest_trivy import (
 )
 
 __all__ = [
-    # Phase 1 - Ingestion
-    "IngestTrivyReportUseCase",
-    "IngestionResult",
-    "IngestionStats",
-    "ingest_trivy_report",
-    # Phase 2 - Enrichment
-    "BatchEnrichmentResult",
-    "EnrichContextUseCase",
-    "EnrichmentResult",
-    "EnrichmentStatsPhase2",
-    "create_enrich_context_use_case",
-    # Phase 3 - Classification
-    "BatchClassificationResult",
-    "ClassificationResult",
-    "ClassificationStats",
-    "ClassifyRiskUseCase",
-    "create_classify_risk_use_case",
-    # Phase 5 - Authorization
     "AuthorizationStats",
     "BatchCheckAuthorizationUseCase",
     "BatchCheckResult",
+    "BatchClassificationResult",
+    "BatchEnrichmentResult",
     "CheckAuthorizationResult",
     "CheckAuthorizationUseCase",
+    "ClassificationResult",
+    "ClassificationStats",
+    "ClassifyRiskUseCase",
+    "EnrichContextUseCase",
+    "EnrichmentResult",
+    "EnrichmentStatsPhase2",
+    "IngestTrivyReportUseCase",
+    "IngestionResult",
+    "IngestionStats",
     "ManageRelationshipsUseCase",
     "RelationshipWriteResult",
     "create_batch_check_authorization_use_case",
     "create_check_authorization_use_case",
+    "create_classify_risk_use_case",
+    "create_enrich_context_use_case",
     "create_manage_relationships_use_case",
+    "ingest_trivy_report",
 ]

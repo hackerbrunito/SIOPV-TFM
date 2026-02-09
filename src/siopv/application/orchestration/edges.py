@@ -17,6 +17,7 @@ from siopv.application.orchestration.state import (
     DiscrepancyResult,
     ThresholdConfig,
 )
+from siopv.application.orchestration.utils import check_any_escalation_needed
 
 logger = structlog.get_logger(__name__)
 
@@ -72,7 +73,6 @@ def _check_escalation_needed(
     Returns:
         True if any CVE should be escalated
     """
-    from siopv.application.orchestration.utils import check_any_escalation_needed
 
     return check_any_escalation_needed(classifications, llm_confidence)  # type: ignore[arg-type]
 

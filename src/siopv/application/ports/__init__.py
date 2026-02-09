@@ -23,19 +23,15 @@ from siopv.application.ports.ml_classifier import (
 from siopv.application.ports.vector_store import VectorStorePort
 
 __all__ = [
-    # Authorization (OpenFGA)
     "AuthorizationModelPort",
     "AuthorizationPort",
     "AuthorizationStorePort",
-    # Enrichment API clients
+    "DatasetLoaderPort",
     "EPSSClientPort",
     "GitHubAdvisoryClientPort",
-    "NVDClientPort",
-    "OSINTSearchClientPort",
-    # Vector store
-    "VectorStorePort",
-    # ML Classification
-    "DatasetLoaderPort",
     "MLClassifierPort",
     "ModelTrainerPort",
+    "NVDClientPort",
+    "OSINTSearchClientPort",
+    "VectorStorePort",
 ]

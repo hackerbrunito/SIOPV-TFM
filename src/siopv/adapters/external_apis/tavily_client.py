@@ -51,6 +51,13 @@ class TavilyClient(OSINTSearchClientPort):
 
     TAVILY_API_URL = "https://api.tavily.com/search"
 
+    # HTTP status codes
+    HTTP_UNAUTHORIZED = 401
+    HTTP_TOO_MANY_REQUESTS = 429
+
+    # Thresholds
+    MIN_RELEVANCE_SCORE = 0.3
+
     def __init__(
         self,
         settings: Settings,
@@ -163,14 +170,16 @@ class TavilyClient(OSINTSearchClientPort):
 
         response = await client.post(self.TAVILY_API_URL, json=payload)
 
-        if response.status_code == 401:
+        if response.status_code == self.HTTP_UNAUTHORIZED:
             logger.error("tavily_invalid_api_key")
-            raise TavilyClientError("Invalid Tavily API key")
+            msg = "Invalid Tavily API key"
+            raise TavilyClientError(msg)
 
-        if response.status_code == 429:
+        if response.status_code == self.HTTP_TOO_MANY_REQUESTS:
             logger.warning("tavily_rate_limit_hit")
+            msg = "Rate limit exceeded"
             raise httpx.HTTPStatusError(
-                "Rate limit exceeded",
+                msg,
                 request=response.request,
                 response=response,
             )
@@ -217,23 +226,16 @@ class TavilyClient(OSINTSearchClientPort):
             # Parse results
             results = [OSINTResult.from_tavily_result(r) for r in raw_results]
 
-            logger.info(
-                "tavily_search_complete",
-                query=query[:50],
-                results_count=len(results),
-            )
-            return results
-
         except CircuitBreakerError:
             logger.warning("tavily_circuit_open", query=query[:50])
             return []
 
         except httpx.TimeoutException as e:
-            logger.error("tavily_timeout", query=query[:50], error=str(e))
+            logger.exception("tavily_timeout", query=query[:50], error=str(e))
             return []
 
         except httpx.HTTPStatusError as e:
-            logger.error(
+            logger.exception(
                 "tavily_http_error",
                 query=query[:50],
                 status_code=e.response.status_code,
@@ -244,8 +246,15 @@ class TavilyClient(OSINTSearchClientPort):
             raise
 
         except Exception as e:
-            logger.error("tavily_unexpected_error", query=query[:50], error=str(e))
+            logger.exception("tavily_unexpected_error", query=query[:50], error=str(e))
             return []
+        else:
+            logger.info(
+                "tavily_search_complete",
+                query=query[:50],
+                results_count=len(results),
+            )
+            return results
 
     async def search_exploit_info(self, cve_id: str) -> list[OSINTResult]:
         """Search specifically for exploit information.
@@ -294,23 +303,23 @@ class TavilyClient(OSINTSearchClientPort):
             for r in raw_results:
                 result = OSINTResult.from_tavily_result(r)
                 # Only include results with reasonable relevance
-                if result.score >= 0.3:
+                if result.score >= self.MIN_RELEVANCE_SCORE:
                     results.append(result)
-
-            logger.info(
-                "tavily_exploit_search_complete",
-                cve_id=cve_id,
-                results_count=len(results),
-            )
-            return results
 
         except CircuitBreakerError:
             logger.warning("tavily_circuit_open_exploit", cve_id=cve_id)
             return []
 
         except Exception as e:
-            logger.error("tavily_exploit_search_error", cve_id=cve_id, error=str(e))
+            logger.exception("tavily_exploit_search_error", cve_id=cve_id, error=str(e))
             return []
+        else:
+            logger.info(
+                "tavily_exploit_search_complete",
+                cve_id=cve_id,
+                results_count=len(results),
+            )
+            return results
 
 
 __all__ = ["TavilyClient", "TavilyClientError"]

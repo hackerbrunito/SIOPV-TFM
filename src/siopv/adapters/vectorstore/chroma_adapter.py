@@ -12,6 +12,7 @@ import json
 from collections import OrderedDict
 from typing import TYPE_CHECKING
 
+import chromadb
 import structlog
 
 from siopv.application.ports import VectorStorePort
@@ -115,8 +116,6 @@ class ChromaDBAdapter(VectorStorePort):
             return self._external_client
 
         if self._owned_client is None:
-            import chromadb
-
             # Ensure persist directory exists
             self._persist_dir.mkdir(parents=True, exist_ok=True)
 

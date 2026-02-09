@@ -351,18 +351,6 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 check_duration_ms=duration_ms,
             )
 
-            logger.info(
-                "authorization_check_completed",
-                allowed=allowed,
-                user=context.user.value,
-                action=context.action.value,
-                resource=str(context.resource),
-                relation=relation.value,
-                duration_ms=duration_ms,
-            )
-
-            return result
-
         except StoreNotFoundError:
             raise
 
@@ -384,7 +372,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except FgaValidationException as e:
-            logger.error(
+            logger.exception(
                 "authorization_validation_error",
                 error=str(e),
             )
@@ -394,7 +382,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "authorization_check_failed",
                 error=str(e),
                 error_type=type(e).__name__,
@@ -406,6 +394,98 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 reason=f"Unexpected error during authorization check: {e}",
                 underlying_error=e,
             ) from e
+        else:
+            logger.info(
+                "authorization_check_completed",
+                allowed=allowed,
+                user=context.user.value,
+                action=context.action.value,
+                resource=str(context.resource),
+                relation=relation.value,
+                duration_ms=duration_ms,
+            )
+
+            return result
+
+    def _build_batch_check_items(
+        self,
+        contexts: list[AuthorizationContext],
+    ) -> tuple[list[ClientBatchCheckItem], list[Relation]]:
+        """Build batch check items from contexts.
+
+        Args:
+            contexts: List of authorization contexts.
+
+        Returns:
+            Tuple of (check_items, relation_map).
+        """
+        check_items: list[ClientBatchCheckItem] = []
+        relation_map: list[Relation] = []
+
+        for ctx in contexts:
+            relation = self._resolve_relation_for_action(ctx)
+            relation_map.append(relation)
+
+            item = ClientBatchCheckItem(
+                user=ctx.user.to_openfga_format(),
+                relation=relation.value,
+                object=ctx.resource.to_openfga_format(),
+            )
+
+            if ctx.contextual_tuples:
+                item.contextual_tuples = [
+                    self._domain_tuple_to_client_tuple(t) for t in ctx.contextual_tuples
+                ]
+
+            check_items.append(item)
+
+        return check_items, relation_map
+
+    def _process_batch_response(
+        self,
+        response: Any,
+        contexts: list[AuthorizationContext],
+        relation_map: list[Relation],
+        total_duration_ms: float,
+    ) -> list[AuthorizationResult]:
+        """Process batch check response into results.
+
+        Args:
+            response: OpenFGA batch check response.
+            contexts: Original authorization contexts.
+            relation_map: Map of relations for each context.
+            total_duration_ms: Total duration of the batch check.
+
+        Returns:
+            List of AuthorizationResult objects.
+        """
+        results: list[AuthorizationResult] = []
+
+        if hasattr(response, "result") and response.result:
+            for i, check_result in enumerate(response.result):
+                if i < len(contexts):
+                    result = AuthorizationResult.from_openfga_response(
+                        context=contexts[i],
+                        checked_relation=relation_map[i],
+                        openfga_allowed=bool(check_result.allowed),
+                        check_duration_ms=total_duration_ms / len(contexts),
+                    )
+                    results.append(result)
+        else:
+            # Fallback: iterate response as iterable
+            for _i, (ctx, relation, check_result) in enumerate(
+                zip(contexts, relation_map, response, strict=False)
+            ):
+                allowed = getattr(check_result, "allowed", False)
+                result = AuthorizationResult.from_openfga_response(
+                    context=ctx,
+                    checked_relation=relation,
+                    openfga_allowed=bool(allowed),
+                    check_duration_ms=total_duration_ms / len(contexts),
+                )
+                results.append(result)
+
+        return results
 
     async def batch_check(
         self,
@@ -424,10 +504,12 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ValueError: If contexts is empty or exceeds max size.
         """
         if not contexts:
-            raise ValueError("contexts list cannot be empty")
+            msg = "contexts list cannot be empty"
+            raise ValueError(msg)
 
         if len(contexts) > MAX_BATCH_SIZE:
-            raise ValueError(f"contexts list exceeds maximum batch size of {MAX_BATCH_SIZE}")
+            msg = f"contexts list exceeds maximum batch size of {MAX_BATCH_SIZE}"
+            raise ValueError(msg)
 
         start_time = time.perf_counter()
 
@@ -435,25 +517,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             client = await self._get_client()
 
             # Build batch check items
-            check_items: list[ClientBatchCheckItem] = []
-            relation_map: list[Relation] = []
-
-            for ctx in contexts:
-                relation = self._resolve_relation_for_action(ctx)
-                relation_map.append(relation)
-
-                item = ClientBatchCheckItem(
-                    user=ctx.user.to_openfga_format(),
-                    relation=relation.value,
-                    object=ctx.resource.to_openfga_format(),
-                )
-
-                if ctx.contextual_tuples:
-                    item.contextual_tuples = [
-                        self._domain_tuple_to_client_tuple(t) for t in ctx.contextual_tuples
-                    ]
-
-                check_items.append(item)
+            check_items, relation_map = self._build_batch_check_items(contexts)
 
             # Execute batch check with circuit breaker
             options: dict[str, Any] = {}
@@ -466,50 +530,15 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
 
             total_duration_ms = (time.perf_counter() - start_time) * 1000
 
-            # Build results - Note: response order may not match request order
-            # We need to match by correlation_id or rebuild based on response structure
-            results: list[AuthorizationResult] = []
-
-            # OpenFGA batch_check returns results that need to be matched
-            # The response contains a 'result' list with each check result
-            if hasattr(response, "result") and response.result:
-                for i, check_result in enumerate(response.result):
-                    if i < len(contexts):
-                        result = AuthorizationResult.from_openfga_response(
-                            context=contexts[i],
-                            checked_relation=relation_map[i],
-                            openfga_allowed=bool(check_result.allowed),
-                            check_duration_ms=total_duration_ms / len(contexts),
-                        )
-                        results.append(result)
-            else:
-                # Fallback: iterate response as iterable
-                for i, (ctx, relation, check_result) in enumerate(
-                    zip(contexts, relation_map, response, strict=False)
-                ):
-                    allowed = getattr(check_result, "allowed", False)
-                    result = AuthorizationResult.from_openfga_response(
-                        context=ctx,
-                        checked_relation=relation,
-                        openfga_allowed=bool(allowed),
-                        check_duration_ms=total_duration_ms / len(contexts),
-                    )
-                    results.append(result)
+            # Process response into results
+            results = self._process_batch_response(
+                response, contexts, relation_map, total_duration_ms
+            )
 
             batch_result = BatchAuthorizationResult(
                 results=results,
                 total_duration_ms=total_duration_ms,
             )
-
-            logger.info(
-                "batch_authorization_check_completed",
-                total=len(contexts),
-                allowed=batch_result.allowed_count,
-                denied=batch_result.denied_count,
-                duration_ms=total_duration_ms,
-            )
-
-            return batch_result
 
         except (StoreNotFoundError, ActionNotMappedError, ValueError):
             raise
@@ -525,7 +554,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "batch_authorization_check_failed",
                 error=str(e),
                 error_type=type(e).__name__,
@@ -537,6 +566,16 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 reason=f"Batch check failed: {e}",
                 underlying_error=e,
             ) from e
+        else:
+            logger.info(
+                "batch_authorization_check_completed",
+                total=len(contexts),
+                allowed=batch_result.allowed_count,
+                denied=batch_result.denied_count,
+                duration_ms=total_duration_ms,
+            )
+
+            return batch_result
 
     async def check_relation(
         self,
@@ -634,17 +673,8 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                     # Skip relations that fail to check (may not be valid for resource type)
                     continue
 
-            logger.debug(
-                "list_user_relations_completed",
-                user=user.value,
-                resource=str(resource),
-                relations=[r.value for r in relations_found],
-            )
-
-            return relations_found
-
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "list_user_relations_failed",
                 user=user.value,
                 resource=str(resource),
@@ -657,6 +687,15 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 reason=f"Failed to list user relations: {e}",
                 underlying_error=e,
             ) from e
+        else:
+            logger.debug(
+                "list_user_relations_completed",
+                user=user.value,
+                resource=str(resource),
+                relations=[r.value for r in relations_found],
+            )
+
+            return relations_found
 
     # ========================================================================
     # AuthorizationStorePort Implementation
@@ -692,7 +731,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             )
 
         except FgaValidationException as e:
-            logger.error(
+            logger.exception(
                 "tuple_validation_error",
                 error=str(e),
             )
@@ -713,7 +752,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "tuple_write_failed",
                 error=str(e),
             )
@@ -737,10 +776,12 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ValueError: If tuples list is empty or exceeds max size.
         """
         if not tuples:
-            raise ValueError("tuples list cannot be empty")
+            msg = "tuples list cannot be empty"
+            raise ValueError(msg)
 
         if len(tuples) > MAX_BATCH_SIZE:
-            raise ValueError(f"tuples list exceeds maximum batch size of {MAX_BATCH_SIZE}")
+            msg = f"tuples list exceeds maximum batch size of {MAX_BATCH_SIZE}"
+            raise ValueError(msg)
 
         try:
             client = await self._get_client()
@@ -823,7 +864,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "tuple_delete_failed",
                 error=str(e),
             )
@@ -846,10 +887,12 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ValueError: If tuples list is empty or exceeds max size.
         """
         if not tuples:
-            raise ValueError("tuples list cannot be empty")
+            msg = "tuples list cannot be empty"
+            raise ValueError(msg)
 
         if len(tuples) > MAX_BATCH_SIZE:
-            raise ValueError(f"tuples list exceeds maximum batch size of {MAX_BATCH_SIZE}")
+            msg = f"tuples list exceeds maximum batch size of {MAX_BATCH_SIZE}"
+            raise ValueError(msg)
 
         try:
             client = await self._get_client()
@@ -933,16 +976,6 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                         )
                         result.append(domain_tuple)
 
-            logger.debug(
-                "tuples_read",
-                count=len(result),
-                user_filter=user.value if user else None,
-                relation_filter=relation.value if relation else None,
-                resource_filter=str(resource) if resource else None,
-            )
-
-            return result
-
         except CircuitBreakerError as e:
             raise AuthorizationCheckError(
                 user=user if user else "filter",
@@ -953,7 +986,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             ) from e
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "tuples_read_failed",
                 error=str(e),
             )
@@ -964,6 +997,16 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 reason=f"Failed to read tuples: {e}",
                 underlying_error=e,
             ) from e
+        else:
+            logger.debug(
+                "tuples_read",
+                count=len(result),
+                user_filter=user.value if user else None,
+                relation_filter=relation.value if relation else None,
+                resource_filter=str(resource) if resource else None,
+            )
+
+            return result
 
     async def read_tuples_for_resource(
         self,
@@ -1047,18 +1090,6 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                     reason="No authorization models found in store",
                 )
 
-            # Get the most recent model (first in list)
-            model = response.authorization_models[0]
-            model_id: str = str(model.id)
-            self._cached_model_id = model_id
-
-            logger.debug(
-                "model_id_retrieved",
-                model_id=model_id,
-            )
-
-            return model_id
-
         except StoreNotFoundError:
             raise
 
@@ -1077,6 +1108,18 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
                 model_id=None,
                 reason=f"Failed to get model ID: {e}",
             ) from e
+        else:
+            # Get the most recent model (first in list)
+            model = response.authorization_models[0]
+            model_id: str = str(model.id)
+            self._cached_model_id = model_id
+
+            logger.debug(
+                "model_id_retrieved",
+                model_id=model_id,
+            )
+
+            return model_id
 
     async def validate_model(self) -> bool:
         """Validate the current authorization model.
@@ -1089,14 +1132,15 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
         """
         try:
             model_id = await self.get_model_id()
-            # If we can retrieve the model ID, the model is valid
-            return model_id is not None
 
         except AuthorizationModelError:
             return False
 
         except StoreNotFoundError:
             raise
+        else:
+            # If we can retrieve the model ID, the model is valid
+            return model_id is not None
 
     async def health_check(self) -> bool:
         """Check if the authorization service is healthy.
@@ -1111,15 +1155,15 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             async with self._circuit_breaker:
                 await client.read_authorization_models()
 
-            logger.debug("openfga_health_check_passed")
-            return True
-
         except Exception as e:
             logger.warning(
                 "openfga_health_check_failed",
                 error=str(e),
             )
             return False
+        else:
+            logger.debug("openfga_health_check_passed")
+            return True
 
 
 __all__ = [

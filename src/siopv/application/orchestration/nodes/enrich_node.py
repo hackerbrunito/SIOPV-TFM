@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from siopv.application.use_cases.enrich_context import EnrichContextUseCase
+from siopv.domain.value_objects import EnrichmentData
+
 if TYPE_CHECKING:
     from siopv.application.orchestration.state import PipelineState
     from siopv.application.ports import (
@@ -19,7 +22,6 @@ if TYPE_CHECKING:
         OSINTSearchClientPort,
         VectorStorePort,
     )
-    from siopv.domain.value_objects import EnrichmentData
 
 logger = structlog.get_logger(__name__)
 
@@ -86,17 +88,17 @@ def enrich_node(
             total_vulnerabilities=len(vulnerabilities),
         )
 
-        return {
-            "enrichments": enrichments,
-            "current_node": "enrich",
-        }
-
     except Exception as e:
         error_msg = f"Enrichment failed: {e}"
-        logger.error("enrich_node_failed", error=error_msg, exception=str(e))
+        logger.exception("enrich_node_failed", error=error_msg, exception=str(e))
         return {
             "enrichments": {},
             "errors": [error_msg],
+            "current_node": "enrich",
+        }
+    else:
+        return {
+            "enrichments": enrichments,
             "current_node": "enrich",
         }
 
@@ -124,7 +126,6 @@ async def _run_enrichment(
     Returns:
         Dictionary mapping CVE ID to EnrichmentData
     """
-    from siopv.application.use_cases.enrich_context import EnrichContextUseCase
 
     # If clients are not provided, return minimal enrichments
     # This allows the node to work in test/mock scenarios
@@ -172,8 +173,6 @@ def _create_minimal_enrichments(vulnerabilities: list[object]) -> dict[str, obje
     Returns:
         Dictionary mapping CVE ID to minimal EnrichmentData
     """
-    from siopv.domain.value_objects import EnrichmentData
-
     enrichments = {}
     for vuln in vulnerabilities:
         cve_id = vuln.cve_id.value  # type: ignore[attr-defined]
@@ -240,17 +239,17 @@ async def enrich_node_async(
             enriched_count=len(enrichments),
         )
 
-        return {
-            "enrichments": enrichments,
-            "current_node": "enrich",
-        }
-
     except Exception as e:
         error_msg = f"Async enrichment failed: {e}"
-        logger.error("enrich_node_async_failed", error=error_msg)
+        logger.exception("enrich_node_async_failed", error=error_msg)
         return {
             "enrichments": {},
             "errors": [error_msg],
+            "current_node": "enrich",
+        }
+    else:
+        return {
+            "enrichments": enrichments,
             "current_node": "enrich",
         }
 

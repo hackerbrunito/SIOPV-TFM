@@ -51,6 +51,10 @@ class NVDClient(NVDClientPort):
     - Response caching (in-memory)
     """
 
+    # HTTP status codes
+    HTTP_NOT_FOUND = 404
+    HTTP_FORBIDDEN = 403
+
     def __init__(
         self,
         settings: Settings,
@@ -136,14 +140,15 @@ class NVDClient(NVDClientPort):
 
         response = await client.get(url)
 
-        if response.status_code == 404:
+        if response.status_code == self.HTTP_NOT_FOUND:
             logger.debug("nvd_cve_not_found", cve_id=cve_id)
             return None
 
-        if response.status_code == 403:
+        if response.status_code == self.HTTP_FORBIDDEN:
             logger.warning("nvd_rate_limit_hit", cve_id=cve_id)
+            msg = "Rate limit exceeded"
             raise httpx.HTTPStatusError(
-                "Rate limit exceeded",
+                msg,
                 request=response.request,
                 response=response,
             )
@@ -191,28 +196,32 @@ class NVDClient(NVDClientPort):
             enrichment = NVDEnrichment.from_nvd_response(data)
             self._cache[cve_id] = enrichment
 
-            logger.info("nvd_cve_fetched", cve_id=cve_id)
-            return enrichment
-
         except CircuitBreakerError:
             logger.warning("nvd_circuit_open", cve_id=cve_id)
-            raise NVDClientError(f"NVD API circuit breaker open for {cve_id}") from None
+            msg = f"NVD API circuit breaker open for {cve_id}"
+            raise NVDClientError(msg) from None
 
         except httpx.TimeoutException as e:
-            logger.error("nvd_timeout", cve_id=cve_id, error=str(e))
-            raise NVDClientError(f"NVD API timeout for {cve_id}") from e
+            logger.exception("nvd_timeout", cve_id=cve_id, error=str(e))
+            msg = f"NVD API timeout for {cve_id}"
+            raise NVDClientError(msg) from e
 
         except httpx.HTTPStatusError as e:
-            logger.error(
+            logger.exception(
                 "nvd_http_error",
                 cve_id=cve_id,
                 status_code=e.response.status_code,
             )
-            raise NVDClientError(f"NVD API error {e.response.status_code} for {cve_id}") from e
+            msg = f"NVD API error {e.response.status_code} for {cve_id}"
+            raise NVDClientError(msg) from e
 
         except Exception as e:
-            logger.error("nvd_unexpected_error", cve_id=cve_id, error=str(e))
-            raise NVDClientError(f"Unexpected error fetching {cve_id}: {e}") from e
+            logger.exception("nvd_unexpected_error", cve_id=cve_id, error=str(e))
+            msg = f"Unexpected error fetching {cve_id}: {e}"
+            raise NVDClientError(msg) from e
+        else:
+            logger.info("nvd_cve_fetched", cve_id=cve_id)
+            return enrichment
 
     async def get_cves_batch(
         self, cve_ids: list[str], *, max_concurrent: int = 5
@@ -233,9 +242,10 @@ class NVDClient(NVDClientPort):
             async with semaphore:
                 try:
                     enrichment = await self.get_cve(cve_id)
-                    return cve_id, enrichment
                 except NVDClientError:
                     return cve_id, None
+                else:
+                    return cve_id, enrichment
 
         tasks = [fetch_one(cve_id) for cve_id in cve_ids]
         completed = await asyncio.gather(*tasks)
@@ -264,10 +274,11 @@ class NVDClient(NVDClientPort):
                 f"{self._base_url}?cveId=CVE-2021-44228",
                 timeout=httpx.Timeout(5.0),
             )
-            return response.status_code in (200, 404)
         except Exception as e:
             logger.warning("nvd_health_check_failed", error=str(e))
             return False
+        else:
+            return response.status_code in (200, 404)
 
     def clear_cache(self) -> None:
         """Clear the in-memory cache."""

@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING
 import structlog
 
 from siopv.domain.entities.ml_feature_vector import MLFeatureVector
+from siopv.domain.value_objects import EnrichmentData
 
 if TYPE_CHECKING:
     from siopv.domain.entities import VulnerabilityRecord
-    from siopv.domain.value_objects import EnrichmentData
 
 logger = structlog.get_logger(__name__)
 
@@ -172,8 +172,6 @@ class FeatureEngineer:
             if enrichment is None:
                 logger.warning("missing_enrichment", cve_id=cve_id)
                 # Create minimal enrichment for missing data
-                from siopv.domain.value_objects import EnrichmentData
-
                 enrichment = EnrichmentData(cve_id=cve_id)
 
             feature_vector = self.extract_features(vuln, enrichment)

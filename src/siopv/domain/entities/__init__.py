@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from siopv.domain.entities.ml_feature_vector import MLFeatureVector
 from siopv.domain.value_objects import (
     CVEId,
     CVSSScore,
@@ -132,12 +133,7 @@ class VulnerabilityRecord(BaseModel):
         return self
 
 
-# Phase 3 - ML Classification
-from siopv.domain.entities.ml_feature_vector import MLFeatureVector
-
 __all__ = [
-    # Phase 1 - Ingestion
-    "VulnerabilityRecord",
-    # Phase 3 - ML Classification
     "MLFeatureVector",
+    "VulnerabilityRecord",
 ]

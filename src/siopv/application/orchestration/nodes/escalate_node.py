@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from siopv.application.orchestration.utils import calculate_escalation_candidates
+
 if TYPE_CHECKING:
     from siopv.application.orchestration.state import PipelineState
 
@@ -79,17 +81,17 @@ def escalate_node(state: PipelineState) -> dict[str, object]:
                 discrepancy=abs(ml_score - confidence),
             )
 
-        return {
-            "escalated_cves": escalated,
-            "current_node": "escalate",
-        }
-
     except Exception as e:
         error_msg = f"Escalation failed: {e}"
-        logger.error("escalate_node_failed", error=error_msg, exception=str(e))
+        logger.exception("escalate_node_failed", error=error_msg, exception=str(e))
         return {
             "escalated_cves": [],
             "errors": [error_msg],
+            "current_node": "escalate",
+        }
+    else:
+        return {
+            "escalated_cves": escalated,
             "current_node": "escalate",
         }
 
@@ -111,7 +113,6 @@ def _identify_escalation_candidates(
     Returns:
         List of CVE IDs requiring escalation
     """
-    from siopv.application.orchestration.utils import calculate_escalation_candidates
 
     escalated, _ = calculate_escalation_candidates(classifications, llm_confidence)
     return escalated

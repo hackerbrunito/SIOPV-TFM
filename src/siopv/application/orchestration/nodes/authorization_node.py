@@ -332,7 +332,8 @@ def authorization_node(
     # Get context from state (user_id guaranteed non-None after anonymous check)
     user_id = state.get("user_id")
     if user_id is None:
-        raise RuntimeError("user_id must exist after anonymous check")
+        msg = "user_id must exist after anonymous check"
+        raise RuntimeError(msg)
     project_id = state.get("project_id") or DEFAULT_PROJECT_ID
 
     # Handle missing authorization port (fail-secure)

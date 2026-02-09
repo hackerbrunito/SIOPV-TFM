@@ -169,8 +169,9 @@ class CISAKEVLoader(DatasetLoaderPort):
             # Verify Content-Type header (M-02 fix)
             content_type = response.headers.get("content-type", "").lower().split(";")[0].strip()
             if content_type not in EXPECTED_CONTENT_TYPES:
+                msg = f"Unexpected Content-Type: {content_type}. Expected application/json"
                 raise SchemaValidationError(
-                    f"Unexpected Content-Type: {content_type}. Expected application/json",
+                    msg,
                     details={
                         "received_content_type": content_type,
                         "expected": list(EXPECTED_CONTENT_TYPES),
@@ -180,9 +181,12 @@ class CISAKEVLoader(DatasetLoaderPort):
             # Check response size before parsing (M-02 fix)
             content_length = response.headers.get("content-length")
             if content_length and int(content_length) > self._max_response_size:
-                raise SchemaValidationError(
+                msg = (
                     f"Response size ({content_length} bytes) exceeds maximum "
-                    f"allowed ({self._max_response_size} bytes)",
+                    f"allowed ({self._max_response_size} bytes)"
+                )
+                raise SchemaValidationError(
+                    msg,
                     details={
                         "content_length": int(content_length),
                         "max_size": self._max_response_size,
@@ -192,9 +196,12 @@ class CISAKEVLoader(DatasetLoaderPort):
             # Also check actual content size
             content = response.content
             if len(content) > self._max_response_size:
-                raise SchemaValidationError(
+                msg = (
                     f"Response size ({len(content)} bytes) exceeds maximum "
-                    f"allowed ({self._max_response_size} bytes)",
+                    f"allowed ({self._max_response_size} bytes)"
+                )
+                raise SchemaValidationError(
+                    msg,
                     details={
                         "actual_size": len(content),
                         "max_size": self._max_response_size,
@@ -205,8 +212,9 @@ class CISAKEVLoader(DatasetLoaderPort):
             try:
                 raw_data = response.json()
             except Exception as e:
+                msg = f"Failed to parse JSON response: {e}"
                 raise SchemaValidationError(
-                    f"Failed to parse JSON response: {e}",
+                    msg,
                     details={"error": str(e)},
                 ) from e
 
@@ -214,8 +222,9 @@ class CISAKEVLoader(DatasetLoaderPort):
         try:
             catalog = KEVCatalog.model_validate(raw_data)
         except Exception as e:
+            msg = f"KEV catalog schema validation failed: {e}"
             raise SchemaValidationError(
-                f"KEV catalog schema validation failed: {e}",
+                msg,
                 details={"validation_error": str(e)},
             ) from e
 

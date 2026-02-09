@@ -344,7 +344,9 @@ class XGBoostClassifier(MLClassifierPort, ModelTrainerPort):
         logger.info(
             "smote_complete",
             after_shape=X_train_balanced.shape,
-            class_distribution=dict(zip(*np.unique(y_train_balanced, return_counts=True))),
+            class_distribution=dict(
+                zip(*np.unique(y_train_balanced, return_counts=True), strict=True)
+            ),
         )
 
         # Get hyperparameters (M-03 fix: pass random_state)

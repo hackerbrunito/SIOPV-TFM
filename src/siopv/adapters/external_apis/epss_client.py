@@ -165,6 +165,30 @@ class EPSSClient(EPSSClientPort):
             score = EPSSScore.from_api_response(data)
             self._cache[cve_id] = score
 
+        except CircuitBreakerError:
+            logger.warning("epss_circuit_open", cve_id=cve_id)
+            msg = f"EPSS API circuit breaker open for {cve_id}"
+            raise EPSSClientError(msg) from None
+
+        except httpx.TimeoutException as e:
+            logger.exception("epss_timeout", cve_id=cve_id, error=str(e))
+            msg = f"EPSS API timeout for {cve_id}"
+            raise EPSSClientError(msg) from e
+
+        except httpx.HTTPStatusError as e:
+            logger.exception(
+                "epss_http_error",
+                cve_id=cve_id,
+                status_code=e.response.status_code,
+            )
+            msg = f"EPSS API error {e.response.status_code} for {cve_id}"
+            raise EPSSClientError(msg) from e
+
+        except Exception as e:
+            logger.exception("epss_unexpected_error", cve_id=cve_id, error=str(e))
+            msg = f"Unexpected error fetching EPSS for {cve_id}: {e}"
+            raise EPSSClientError(msg) from e
+        else:
             logger.info(
                 "epss_score_fetched",
                 cve_id=cve_id,
@@ -172,26 +196,6 @@ class EPSSClient(EPSSClientPort):
                 percentile=score.percentile,
             )
             return score
-
-        except CircuitBreakerError:
-            logger.warning("epss_circuit_open", cve_id=cve_id)
-            raise EPSSClientError(f"EPSS API circuit breaker open for {cve_id}") from None
-
-        except httpx.TimeoutException as e:
-            logger.error("epss_timeout", cve_id=cve_id, error=str(e))
-            raise EPSSClientError(f"EPSS API timeout for {cve_id}") from e
-
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "epss_http_error",
-                cve_id=cve_id,
-                status_code=e.response.status_code,
-            )
-            raise EPSSClientError(f"EPSS API error {e.response.status_code} for {cve_id}") from e
-
-        except Exception as e:
-            logger.error("epss_unexpected_error", cve_id=cve_id, error=str(e))
-            raise EPSSClientError(f"Unexpected error fetching EPSS for {cve_id}: {e}") from e
 
     @retry(
         retry=retry_if_exception_type((httpx.TimeoutException, httpx.HTTPStatusError)),
@@ -280,7 +284,7 @@ class EPSSClient(EPSSClientPort):
             logger.warning("epss_circuit_open_batch")
 
         except Exception as e:
-            logger.error("epss_batch_error", error=str(e))
+            logger.exception("epss_batch_error", error=str(e))
 
         return results
 

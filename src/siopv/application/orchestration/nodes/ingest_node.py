@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from siopv.application.use_cases.ingest_trivy import IngestTrivyReportUseCase
+
 if TYPE_CHECKING:
     from siopv.application.orchestration.state import PipelineState
 
@@ -28,7 +30,6 @@ def ingest_node(state: PipelineState) -> dict[str, object]:
     Returns:
         State updates with vulnerabilities list and processed_count
     """
-    from siopv.application.use_cases.ingest_trivy import IngestTrivyReportUseCase
 
     logger.info("ingest_node_started", thread_id=state.get("thread_id"))
 
@@ -64,7 +65,7 @@ def ingest_node(state: PipelineState) -> dict[str, object]:
 
     except FileNotFoundError as e:
         error_msg = f"Report file not found: {report_path}"
-        logger.error("ingest_node_failed", error=error_msg, exception=str(e))
+        logger.exception("ingest_node_failed", error=error_msg, exception=str(e))
         return {
             "vulnerabilities": [],
             "processed_count": 0,
@@ -74,7 +75,7 @@ def ingest_node(state: PipelineState) -> dict[str, object]:
 
     except Exception as e:
         error_msg = f"Ingestion failed: {e}"
-        logger.error("ingest_node_failed", error=error_msg, exception=str(e))
+        logger.exception("ingest_node_failed", error=error_msg, exception=str(e))
         return {
             "vulnerabilities": [],
             "processed_count": 0,
@@ -97,7 +98,6 @@ def ingest_node_from_dict(
     Returns:
         State updates with vulnerabilities list and processed_count
     """
-    from siopv.application.use_cases.ingest_trivy import IngestTrivyReportUseCase
 
     logger.info("ingest_node_from_dict_started", thread_id=state.get("thread_id"))
 
@@ -119,7 +119,7 @@ def ingest_node_from_dict(
 
     except Exception as e:
         error_msg = f"Ingestion from dict failed: {e}"
-        logger.error("ingest_node_from_dict_failed", error=error_msg)
+        logger.exception("ingest_node_from_dict_failed", error=error_msg)
         return {
             "vulnerabilities": [],
             "processed_count": 0,

@@ -73,12 +73,7 @@ class SHAPExplainer:
 
         # For binary classification, shap_values may be a list [negative_class, positive_class]
         # We want the positive class (exploited) values
-        if isinstance(shap_values, list):
-            # Binary classification: use positive class
-            values = shap_values[1][0]
-        else:
-            # Single output
-            values = shap_values[0]
+        values = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
 
         # Get base value (expected value)
         if isinstance(explainer.expected_value, np.ndarray):
@@ -122,10 +117,7 @@ class SHAPExplainer:
         shap_values = explainer.shap_values(X)
 
         # Handle binary classification
-        if isinstance(shap_values, list):
-            values_array = shap_values[1]  # Positive class
-        else:
-            values_array = shap_values
+        values_array = shap_values[1] if isinstance(shap_values, list) else shap_values
 
         # Get base value
         if isinstance(explainer.expected_value, np.ndarray):
@@ -135,7 +127,7 @@ class SHAPExplainer:
 
         # Create SHAPValues for each
         results = []
-        for i, fv in enumerate(feature_vectors):
+        for i, _fv in enumerate(feature_vectors):
             results.append(
                 SHAPValues(
                     feature_names=self._feature_names,
@@ -173,10 +165,7 @@ class SHAPExplainer:
         # Get SHAP values
         shap_values = explainer.shap_values(X)
 
-        if isinstance(shap_values, list):
-            values_array = shap_values[1]
-        else:
-            values_array = shap_values
+        values_array = shap_values[1] if isinstance(shap_values, list) else shap_values
 
         # Calculate mean absolute SHAP value for each feature
         mean_abs_shap = np.mean(np.abs(values_array), axis=0)
@@ -212,10 +201,7 @@ class SHAPExplainer:
         # Get SHAP values
         shap_values = explainer.shap_values(X)
 
-        if isinstance(shap_values, list):
-            values_array = shap_values[1]
-        else:
-            values_array = shap_values
+        values_array = shap_values[1] if isinstance(shap_values, list) else shap_values
 
         return values_array, X, self._feature_names
 

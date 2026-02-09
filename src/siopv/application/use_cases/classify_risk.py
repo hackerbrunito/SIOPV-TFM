@@ -16,12 +16,12 @@ from typing import TYPE_CHECKING
 import structlog
 
 from siopv.adapters.ml.feature_engineer import FeatureEngineer
+from siopv.domain.value_objects import EnrichmentData
 from siopv.domain.value_objects.risk_score import RiskScore
 
 if TYPE_CHECKING:
     from siopv.application.ports.ml_classifier import MLClassifierPort
     from siopv.domain.entities import VulnerabilityRecord
-    from siopv.domain.value_objects import EnrichmentData
 
 logger = structlog.get_logger(__name__)
 
@@ -137,7 +137,7 @@ class ClassifyRiskUseCase:
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "classification_failed",
                 cve_id=cve_id,
                 error=str(e),
@@ -178,8 +178,6 @@ class ClassifyRiskUseCase:
             if enrichment is None:
                 logger.warning("missing_enrichment_for_classification", cve_id=cve_id)
                 # Create minimal enrichment
-                from siopv.domain.value_objects import EnrichmentData
-
                 enrichment = EnrichmentData(cve_id=cve_id)
 
             result = self.execute(vuln, enrichment)

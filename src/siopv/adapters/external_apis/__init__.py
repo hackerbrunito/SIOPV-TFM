@@ -10,9 +10,6 @@ from siopv.adapters.external_apis.tavily_client import TavilyClient, TavilyClien
 from siopv.adapters.external_apis.trivy_parser import TrivyParser, parse_trivy_report
 
 __all__ = [
-    # Phase 1 - Ingestion
-    "TrivyParser",
-    "parse_trivy_report",
     # Phase 2 - Enrichment clients
     "EPSSClient",
     "EPSSClientError",
@@ -22,4 +19,7 @@ __all__ = [
     "NVDClientError",
     "TavilyClient",
     "TavilyClientError",
+    # Phase 1 - Ingestion
+    "TrivyParser",
+    "parse_trivy_report",
 ]

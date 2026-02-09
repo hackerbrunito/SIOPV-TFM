@@ -7,6 +7,20 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from siopv.domain.value_objects.enrichment import (
+    CVSSVector,
+    EnrichmentData,
+    EPSSScore,
+    GitHubAdvisory,
+    NVDEnrichment,
+    OSINTResult,
+)
+from siopv.domain.value_objects.risk_score import (
+    LIMEExplanation,
+    RiskScore,
+    SHAPValues,
+)
+
 # Severity levels as defined in the specification
 SeverityLevel = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]
 
@@ -94,36 +108,19 @@ class LayerInfo(BaseModel):
         )
 
 
-from siopv.domain.value_objects.enrichment import (
-    CVSSVector,
-    EnrichmentData,
-    EPSSScore,
-    GitHubAdvisory,
-    NVDEnrichment,
-    OSINTResult,
-)
-from siopv.domain.value_objects.risk_score import (
-    LIMEExplanation,
-    RiskScore,
-    SHAPValues,
-)
-
 __all__ = [
-    # Phase 1 - Ingestion
     "CVEId",
     "CVSSScore",
-    "LayerInfo",
-    "PackageVersion",
-    "SeverityLevel",
-    # Phase 2 - Enrichment
     "CVSSVector",
-    "EnrichmentData",
     "EPSSScore",
+    "EnrichmentData",
     "GitHubAdvisory",
+    "LIMEExplanation",
+    "LayerInfo",
     "NVDEnrichment",
     "OSINTResult",
-    # Phase 3 - ML Classification
-    "LIMEExplanation",
+    "PackageVersion",
     "RiskScore",
     "SHAPValues",
+    "SeverityLevel",
 ]

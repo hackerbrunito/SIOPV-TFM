@@ -8,7 +8,7 @@ API Documentation: https://docs.github.com/en/graphql/reference/objects#security
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
 import structlog
@@ -110,8 +110,11 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
     - Circuit breaker for fault tolerance
     """
 
+    # HTTP status codes
+    HTTP_FORBIDDEN = 403
+
     # Ecosystem mapping for GraphQL enum
-    ECOSYSTEM_MAP = {
+    ECOSYSTEM_MAP: ClassVar[dict[str, str]] = {
         "npm": "NPM",
         "pip": "PIP",
         "pypi": "PIP",
@@ -221,12 +224,13 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
         response = await client.post(self._graphql_url, json=payload)
 
         # Check for rate limiting
-        if response.status_code == 403:
+        if response.status_code == self.HTTP_FORBIDDEN:
             remaining = response.headers.get("X-RateLimit-Remaining", "0")
             if remaining == "0":
                 logger.warning("github_rate_limit_hit")
+                msg = "Rate limit exceeded"
                 raise httpx.HTTPStatusError(
-                    "Rate limit exceeded",
+                    msg,
                     request=response.request,
                     response=response,
                 )
@@ -239,7 +243,8 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
         if "errors" in data:
             error_msg = data["errors"][0].get("message", "Unknown GraphQL error")
             logger.error("github_graphql_error", error=error_msg)
-            raise GitHubAdvisoryClientError(f"GraphQL error: {error_msg}")
+            msg = f"GraphQL error: {error_msg}"
+            raise GitHubAdvisoryClientError(msg)
 
         result: JsonDict = data.get("data", {})
         return result
@@ -279,41 +284,39 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
             advisory = GitHubAdvisory.from_graphql_response(advisories[0])
             self._cache[cve_id] = advisory
 
+        except CircuitBreakerError:
+            logger.warning("github_circuit_open", cve_id=cve_id)
+            msg = f"GitHub API circuit breaker open for {cve_id}"
+            raise GitHubAdvisoryClientError(msg) from None
+
+        except httpx.TimeoutException as e:
+            logger.exception("github_timeout", cve_id=cve_id, error=str(e))
+            msg = f"GitHub API timeout for {cve_id}"
+            raise GitHubAdvisoryClientError(msg) from e
+
+        except httpx.HTTPStatusError as e:
+            logger.exception(
+                "github_http_error",
+                cve_id=cve_id,
+                status_code=e.response.status_code,
+            )
+            msg = f"GitHub API error {e.response.status_code} for {cve_id}"
+            raise GitHubAdvisoryClientError(msg) from e
+
+        except GitHubAdvisoryClientError:
+            raise
+
+        except Exception as e:
+            logger.exception("github_unexpected_error", cve_id=cve_id, error=str(e))
+            msg = f"Unexpected error fetching advisory for {cve_id}: {e}"
+            raise GitHubAdvisoryClientError(msg) from e
+        else:
             logger.info(
                 "github_advisory_fetched",
                 cve_id=cve_id,
                 ghsa_id=advisory.ghsa_id,
             )
             return advisory
-
-        except CircuitBreakerError:
-            logger.warning("github_circuit_open", cve_id=cve_id)
-            raise GitHubAdvisoryClientError(
-                f"GitHub API circuit breaker open for {cve_id}"
-            ) from None
-
-        except httpx.TimeoutException as e:
-            logger.error("github_timeout", cve_id=cve_id, error=str(e))
-            raise GitHubAdvisoryClientError(f"GitHub API timeout for {cve_id}") from e
-
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "github_http_error",
-                cve_id=cve_id,
-                status_code=e.response.status_code,
-            )
-            raise GitHubAdvisoryClientError(
-                f"GitHub API error {e.response.status_code} for {cve_id}"
-            ) from e
-
-        except GitHubAdvisoryClientError:
-            raise
-
-        except Exception as e:
-            logger.error("github_unexpected_error", cve_id=cve_id, error=str(e))
-            raise GitHubAdvisoryClientError(
-                f"Unexpected error fetching advisory for {cve_id}: {e}"
-            ) from e
 
     async def get_advisories_for_package(
         self,
@@ -373,24 +376,24 @@ class GitHubAdvisoryClient(GitHubAdvisoryClientPort):
                     advisory = GitHubAdvisory.from_graphql_response(advisory_data)
                     advisories.append(advisory)
 
+        except CircuitBreakerError:
+            logger.warning("github_circuit_open_package", package=package_name)
+            return []
+
+        except Exception as e:
+            logger.exception(
+                "github_package_error",
+                package=package_name,
+                error=str(e),
+            )
+            return []
+        else:
             logger.info(
                 "github_package_advisories_fetched",
                 package=package_name,
                 count=len(advisories),
             )
             return advisories
-
-        except CircuitBreakerError:
-            logger.warning("github_circuit_open_package", package=package_name)
-            return []
-
-        except Exception as e:
-            logger.error(
-                "github_package_error",
-                package=package_name,
-                error=str(e),
-            )
-            return []
 
     def clear_cache(self) -> None:
         """Clear the in-memory cache."""
