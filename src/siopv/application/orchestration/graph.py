@@ -9,9 +9,10 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import structlog
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
@@ -284,7 +285,10 @@ class PipelineGraphBuilder:
             raise RuntimeError(msg)
 
         checkpointer = self._create_checkpointer() if with_checkpointer else None
-        self._compiled = self._graph.compile(checkpointer=checkpointer)
+        self._compiled = cast(
+            CompiledStateGraph[PipelineState],
+            self._graph.compile(checkpointer=checkpointer),
+        )
 
         logger.info(
             "pipeline_graph_compiled",
@@ -423,7 +427,7 @@ def run_pipeline(
     )
 
     # Configure execution
-    config = {"configurable": {"thread_id": initial_state["thread_id"]}}
+    config: RunnableConfig = {"configurable": {"thread_id": initial_state["thread_id"]}}
 
     logger.info(
         "pipeline_execution_started",
@@ -446,7 +450,7 @@ def run_pipeline(
         error_count=len(result.get("errors", [])),
     )
 
-    return result  # type: ignore[no-any-return]
+    return cast(PipelineState, result)
 
 
 __all__ = [
