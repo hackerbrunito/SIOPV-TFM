@@ -36,6 +36,13 @@ def mock_settings() -> MagicMock:
     settings = MagicMock()
     settings.openfga_api_url = "http://localhost:8080"
     settings.openfga_store_id = "test-store-id"
+    settings.openfga_api_token = None
+    settings.openfga_authorization_model_id = None
+    settings.openfga_auth_method = "none"
+    settings.openfga_client_id = None
+    settings.openfga_client_secret = None
+    settings.openfga_api_audience = None
+    settings.openfga_api_token_issuer = None
     settings.circuit_breaker_failure_threshold = 5
     settings.circuit_breaker_recovery_timeout = 60
     return settings
@@ -144,12 +151,26 @@ class TestGetAuthorizationPort:
         settings1 = MagicMock()
         settings1.openfga_api_url = "http://localhost:8080"
         settings1.openfga_store_id = "store-1"
+        settings1.openfga_api_token = None
+        settings1.openfga_authorization_model_id = None
+        settings1.openfga_auth_method = "none"
+        settings1.openfga_client_id = None
+        settings1.openfga_client_secret = None
+        settings1.openfga_api_audience = None
+        settings1.openfga_api_token_issuer = None
         settings1.circuit_breaker_failure_threshold = 5
         settings1.circuit_breaker_recovery_timeout = 60
 
         settings2 = MagicMock()
         settings2.openfga_api_url = "http://localhost:9090"
         settings2.openfga_store_id = "store-2"
+        settings2.openfga_api_token = None
+        settings2.openfga_authorization_model_id = None
+        settings2.openfga_auth_method = "none"
+        settings2.openfga_client_id = None
+        settings2.openfga_client_secret = None
+        settings2.openfga_api_audience = None
+        settings2.openfga_api_token_issuer = None
         settings2.circuit_breaker_failure_threshold = 5
         settings2.circuit_breaker_recovery_timeout = 60
 
@@ -210,12 +231,26 @@ class TestGetAuthorizationStorePort:
         settings1 = MagicMock()
         settings1.openfga_api_url = "http://localhost:8080"
         settings1.openfga_store_id = "store-1"
+        settings1.openfga_api_token = None
+        settings1.openfga_authorization_model_id = None
+        settings1.openfga_auth_method = "none"
+        settings1.openfga_client_id = None
+        settings1.openfga_client_secret = None
+        settings1.openfga_api_audience = None
+        settings1.openfga_api_token_issuer = None
         settings1.circuit_breaker_failure_threshold = 5
         settings1.circuit_breaker_recovery_timeout = 60
 
         settings2 = MagicMock()
         settings2.openfga_api_url = "http://localhost:9090"
         settings2.openfga_store_id = "store-2"
+        settings2.openfga_api_token = None
+        settings2.openfga_authorization_model_id = None
+        settings2.openfga_auth_method = "none"
+        settings2.openfga_client_id = None
+        settings2.openfga_client_secret = None
+        settings2.openfga_api_audience = None
+        settings2.openfga_api_token_issuer = None
         settings2.circuit_breaker_failure_threshold = 5
         settings2.circuit_breaker_recovery_timeout = 60
 
@@ -270,12 +305,26 @@ class TestGetAuthorizationModelPort:
         settings1 = MagicMock()
         settings1.openfga_api_url = "http://localhost:8080"
         settings1.openfga_store_id = "store-1"
+        settings1.openfga_api_token = None
+        settings1.openfga_authorization_model_id = None
+        settings1.openfga_auth_method = "none"
+        settings1.openfga_client_id = None
+        settings1.openfga_client_secret = None
+        settings1.openfga_api_audience = None
+        settings1.openfga_api_token_issuer = None
         settings1.circuit_breaker_failure_threshold = 5
         settings1.circuit_breaker_recovery_timeout = 60
 
         settings2 = MagicMock()
         settings2.openfga_api_url = "http://localhost:9090"
         settings2.openfga_store_id = "store-2"
+        settings2.openfga_api_token = None
+        settings2.openfga_authorization_model_id = None
+        settings2.openfga_auth_method = "none"
+        settings2.openfga_client_id = None
+        settings2.openfga_client_secret = None
+        settings2.openfga_api_audience = None
+        settings2.openfga_api_token_issuer = None
         settings2.circuit_breaker_failure_threshold = 5
         settings2.circuit_breaker_recovery_timeout = 60
 

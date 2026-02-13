@@ -1,0 +1,441 @@
+# SIOPV Local Development -- OpenFGA + Postgres
+# Usage: docker compose up -d
+# Playground: http://localhost:3000
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRODUCTION DEPLOYMENT GUIDE
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# IMPORTANT: This is a LOCAL DEVELOPMENT configuration. For production, you MUST:
+#
+# 1. TLS/HTTPS CONFIGURATION
+#    - Generate or obtain TLS certificates (Let's Encrypt, self-signed for internal, etc.)
+#    - For OpenFGA: Enable TLS on ports 8080/8081 via environment variables
+#    - For Postgres: Enable SSL mode (sslmode=require in connection string)
+#    - Mount certificate files as volumes (read-only) at container startup
+#    - Set certificate paths via environment variables (see notes below)
+#
+# 2. ENVIRONMENT VARIABLES FOR PRODUCTION
+#    Use .env or .env.production with these variables:
+#    - POSTGRES_PASSWORD: Use strong, random password (min 32 chars)
+#    - OPENFGA_AUTHN_PRESHARED_KEYS: Use long, cryptographically secure keys
+#    - OPENFGA_DATASTORE_URI: Change sslmode from disable to require/prefer
+#    - TLS_CERT_FILE: Path to server certificate (mounted volume)
+#    - TLS_KEY_FILE: Path to private key (mounted volume)
+#    - OPENFGA_TLS_ENABLED: Set to "true" to enable TLS
+#
+# 3. SECRETS MANAGEMENT
+#    DO NOT commit credentials to git (.env files should be in .gitignore)
+#    - Use docker secrets for swarm deployments
+#    - Use cloud provider secrets (AWS Secrets Manager, GCP Secret Manager, etc.)
+#    - Use external .env files loaded at runtime
+#    - Rotate credentials regularly
+#    - Store private keys securely (not in container images)
+#
+# 4. POSTGRES HARDENING
+#    - Use strong, unique passwords (32+ chars, random)
+#    - Enable SSL connections (sslmode=require)
+#    - Restrict network access (use internal networks, not exposed ports)
+#    - Run as non-root user in container
+#    - Use named volumes for data persistence (not bind mounts if possible)
+#    - Regular backups: dump and store securely (consider encrypted storage)
+#    - Enable query logging for audit trails (set log_statement=all in config)
+#
+# 5. OPENFGA HARDENING
+#    - Disable playground in production (set OPENFGA_PLAYGROUND_ENABLED=false)
+#    - Implement proper authentication (not just preshared keys for high-security)
+#    - Use TLS for all client connections
+#    - Restrict API access via firewall/network policies
+#    - Monitor health checks and set alerts
+#    - Use structured logging (JSON) for security event tracking
+#    - Implement rate limiting at reverse proxy layer (nginx, Envoy, etc.)
+#
+# 6. CERTIFICATE MANAGEMENT (FOR TLS)
+#    Example production setup with mounted certificates:
+#    volumes:
+#      - ./certs/server.crt:/etc/openfga/tls/server.crt:ro
+#      - ./certs/server.key:/etc/openfga/tls/server.key:ro
+#    environment:
+#      - OPENFGA_TLS_ENABLED=true
+#      - OPENFGA_TLS_CERT_FILE=/etc/openfga/tls/server.crt
+#      - OPENFGA_TLS_KEY_FILE=/etc/openfga/tls/server.key
+#
+# 7. NETWORK SECURITY
+#    - Use Docker networks instead of exposing ports (unless necessary)
+#    - For internal services: remove port mappings, use service discovery
+#    - For public-facing services: place behind reverse proxy with TLS termination
+#    - Implement network policies to restrict inter-container communication
+#    - Use firewalls to restrict database access to application layer only
+#
+# 8. DATA PERSISTENCE & BACKUP
+#    - Always use named volumes for stateful data (Postgres)
+#    - Implement regular backup strategy (daily or more frequent)
+#    - Test backup restoration procedures regularly
+#    - Store backups in secure, redundant storage with encryption
+#    - Document recovery time objectives (RTO) and recovery point objectives (RPO)
+#
+# 9. MONITORING & LOGGING
+#    - Collect logs to centralized system (ELK, Splunk, etc.)
+#    - Set alerts for authentication failures, connection errors
+#    - Monitor container resource usage (CPU, memory, disk I/O)
+#    - Track OpenFGA API latency and error rates
+#    - Monitor Postgres connection count and query performance
+#
+# 10. COMPLIANCE & AUDIT
+#     - Implement audit logging for all API calls and schema changes
+#     - Maintain audit logs for regulatory compliance (if required)
+#     - Use secure, read-only storage for audit logs
+#     - Implement log retention policies as per compliance requirements
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # OpenFGA Database Migration Service
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Runs database migrations before OpenFGA startup (one-time initialization)
+  #
+  # PRODUCTION NOTES:
+  # - sslmode=disable is for LOCAL DEV ONLY. In production, use:
+  #   sslmode=require (mandatory SSL, fails if unavailable)
+  #   sslmode=prefer (use SSL if available, fallback to unencrypted)
+  # - Use environment variables from .env file:
+  #   OPENFGA_DATASTORE_URI=postgres://user:${DB_PASSWORD}@host:5432/openfga?sslmode=require
+  # - Store DB_PASSWORD in secure secrets management system
+  # - Migration should complete with zero downtime (run before service is live)
+  # ─────────────────────────────────────────────────────────────────────────────
+  openfga-migrate:
+    image: openfga/openfga:latest
+    command: migrate
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      # PRODUCTION: Replace with sslmode=require and use secret password
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+    depends_on:
+      openfga-postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # OpenFGA Authorization Service
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Main OpenFGA service for authorization checks, model management, and relationships
+  #
+  # PRODUCTION REQUIREMENTS & SECURITY HARDENING:
+  #
+  # 1. TLS CONFIGURATION (CRITICAL FOR PRODUCTION)
+  #    Add to environment section:
+  #      - OPENFGA_TLS_ENABLED=true
+  #      - OPENFGA_TLS_CERT_FILE=/etc/openfga/tls/server.crt
+  #      - OPENFGA_TLS_KEY_FILE=/etc/openfga/tls/server.key
+  #    Add to volumes section:
+  #      - ./certs/server.crt:/etc/openfga/tls/server.crt:ro
+  #      - ./certs/server.key:/etc/openfga/tls/server.key:ro
+  #
+  # 2. AUTHENTICATION & AUTHORIZATION (MUST CHANGE FOR PRODUCTION)
+  #    Current: preshared key with weak dev key "dev-key-siopv-local-1"
+  #    Production options:
+  #    a) Use stronger preshared keys (min 32 chars, cryptographically random)
+  #       OPENFGA_AUTHN_PRESHARED_KEYS=<strong-random-key-from-secrets>
+  #    b) Use OIDC/OAuth2 integration for production identity providers
+  #       OPENFGA_AUTHN_METHOD=oidc
+  #       OPENFGA_AUTHN_OIDC_* config variables
+  #
+  # 3. DISABLE PLAYGROUND IN PRODUCTION
+  #    OPENFGA_PLAYGROUND_ENABLED=false (currently true - security risk)
+  #    Playground exposes your authorization model and relationships
+  #
+  # 4. DATABASE CONNECTION SECURITY
+  #    - sslmode=disable must change to sslmode=require
+  #    - Use environment variable with secret password:
+  #      OPENFGA_DATASTORE_URI=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:5432/openfga?sslmode=require&sslrootcert=/etc/ssl/certs/ca.crt
+  #
+  # 5. PORTS & NETWORK EXPOSURE
+  #    Current ports (8080, 8081, 3000) expose all services publicly
+  #    Production recommendations:
+  #    - Remove ports if running behind reverse proxy (nginx, Envoy, etc.)
+  #    - Use internal Docker network for inter-service communication
+  #    - Expose only necessary ports (typically 8080 for API, 8081 for admin)
+  #    - Place behind reverse proxy with:
+  #      * TLS termination (HTTPS)
+  #      * Request logging and monitoring
+  #      * Rate limiting
+  #      * DDoS protection
+  #
+  # 6. LOGGING & MONITORING
+  #    - JSON format for structured logging ✓ (good)
+  #    - Send logs to centralized system (ELK, Splunk, Datadog, etc.)
+  #    - Set up alerts for:
+  #      * Authentication failures
+  #      * High error rates
+  #      * Slow authorization checks
+  #      * Connection pool exhaustion
+  #
+  # 7. HEALTHCHECKS
+  #    Currently uses HTTP (not HTTPS)
+  #    Production: Update to use HTTPS when TLS is enabled
+  #    - Change to: wget --secure-protocol=TLSv1_2 https://localhost:8080/healthz
+  #
+  # 8. RESOURCE LIMITS (ADD FOR PRODUCTION)
+  #    deploy:
+  #      resources:
+  #        limits:
+  #          cpus: '2'
+  #          memory: 2G
+  #        reservations:
+  #          cpus: '1'
+  #          memory: 1G
+  #
+  # 9. RESTART POLICY (ADD FOR PRODUCTION)
+  #    restart_policy:
+  #      condition: on-failure
+  #      delay: 5s
+  #      max_attempts: 3
+  #
+  # ─────────────────────────────────────────────────────────────────────────────
+  openfga:
+    image: openfga/openfga:latest
+    command: run
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=postgres
+      # PRODUCTION: Enable SSL mode and use secret password
+      - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
+      # PRODUCTION: Implement proper authentication (change from preshared or make key strong)
+      - OPENFGA_AUTHN_METHOD=preshared
+      # WARNING: dev-key-siopv-local-1 is insecure. Use ${OPENFGA_API_KEY} from secrets
+      - OPENFGA_AUTHN_PRESHARED_KEYS=dev-key-siopv-local-1
+      # Uncomment for OIDC mode (requires Keycloak setup):
+      # - OPENFGA_AUTHN_METHOD=oidc
+      # - OPENFGA_AUTHN_OIDC_ISSUER=http://keycloak:8080/realms/siopv
+      # - OPENFGA_AUTHN_OIDC_AUDIENCE=openfga-api
+      # PRODUCTION: Set to false (playground exposes authorization model)
+      - OPENFGA_PLAYGROUND_ENABLED=true
+      # JSON logging is good for centralized logging systems ✓
+      - OPENFGA_LOG_FORMAT=json
+      # PRODUCTION: Uncomment and mount certificate files (see volumes section)
+      # - OPENFGA_TLS_ENABLED=true
+      # - OPENFGA_TLS_CERT_FILE=/etc/openfga/tls/server.crt
+      # - OPENFGA_TLS_KEY_FILE=/etc/openfga/tls/server.key
+    ports:
+      # 8080: OpenFGA API (authorization checks, relationships)
+      # PRODUCTION: Remove if behind reverse proxy, use internal network only
+      - "8080:8080"
+      # 8081: OpenFGA Admin API (model management)
+      # PRODUCTION: Should be internal/protected, not publicly exposed
+      - "8081:8081"
+      # 3000: OpenFGA Playground (web UI)
+      # PRODUCTION: Remove or restrict to VPN/admin access only
+      - "3000:3000"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    # PRODUCTION: Add volume mounts for TLS certificates
+    # volumes:
+    #   - ./certs/server.crt:/etc/openfga/tls/server.crt:ro
+    #   - ./certs/server.key:/etc/openfga/tls/server.key:ro
+    healthcheck:
+      # PRODUCTION: Change to https:// when TLS is enabled
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PostgreSQL Database for OpenFGA
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Stores all OpenFGA data: relationships, authorization models, types, etc.
+  #
+  # CRITICAL SECURITY REQUIREMENTS FOR PRODUCTION:
+  #
+  # 1. AUTHENTICATION & CREDENTIALS (CRITICAL)
+  #    Current credentials are weak ("openfga" for both user and password)
+  #    Production requirements:
+  #    - Use strong, random password (min 32 chars, special characters)
+  #    - Store credentials in secrets management system
+  #    - Use environment variables from .env or secrets:
+  #      POSTGRES_USER=${DB_USER}
+  #      POSTGRES_PASSWORD=${DB_PASSWORD}
+  #    - Create separate roles for different purposes (app user, backup, admin)
+  #    - Never commit credentials to git
+  #
+  # 2. SSL/TLS CONNECTIONS (REQUIRED FOR PRODUCTION)
+  #    PostgreSQL needs to enforce encrypted connections
+  #    Configuration needed in postgres.conf or via environment:
+  #    - ssl = on
+  #    - ssl_cert_file = /var/lib/postgresql/server.crt
+  #    - ssl_key_file = /var/lib/postgresql/server.key
+  #    Mount certificates:
+  #      volumes:
+  #        - ./certs/postgres.crt:/var/lib/postgresql/server.crt:ro
+  #        - ./certs/postgres.key:/var/lib/postgresql/server.key:ro
+  #    OpenFGA connection string must use sslmode=require:
+  #      postgres://${DB_USER}:${DB_PASSWORD}@host:5432/openfga?sslmode=require
+  #
+  # 3. DATABASE & USER ISOLATION
+  #    Consider creating limited user for OpenFGA (not superuser):
+  #    - Application user: limited to openfga schema/tables
+  #    - Backup user: can read but not modify
+  #    - Admin user: for maintenance (separate from app)
+  #
+  # 4. NETWORK SECURITY
+  #    Current: No ports exposed (good for default Docker bridge network)
+  #    Production:
+  #    - Never expose port 5432 to public internet
+  #    - Restrict to internal Docker network or VPN
+  #    - Use pg_hba.conf for connection restrictions:
+  #      - Allow only trusted hosts
+  #      - Require SSL for remote connections
+  #      - Use md5 or scram-sha-256 authentication
+  #
+  # 5. DATA PERSISTENCE & BACKUP (CRITICAL)
+  #    Named volume (openfga_data) is good for local development
+  #    Production requirements:
+  #    - Automated daily/hourly backups (depending on RPO)
+  #    - Backups must be encrypted and stored securely (not locally)
+  #    - Regular restore testing (monthly at minimum)
+  #    - Implement Point-in-Time Recovery (PITR):
+  #      * Enable WAL archiving (Write-Ahead Logging)
+  #      * Archive WAL files to secure remote storage (S3, GCS, etc.)
+  #      * Maintain backup chain for recovery flexibility
+  #    - Document recovery procedures and test them
+  #
+  # 6. PERFORMANCE & RESOURCE MANAGEMENT
+  #    Recommendations:
+  #    - Set shared_buffers = 25% of available RAM
+  #    - Set effective_cache_size = 50-75% of available RAM
+  #    - Set work_mem = (RAM / (max_connections * 3))
+  #    - Enable connection pooling (pgBouncer) for many clients
+  #    - Monitor and tune based on workload
+  #
+  # 7. QUERY & AUDIT LOGGING
+  #    For security and compliance:
+  #    log_statement = 'all'          # Log all SQL statements
+  #    log_duration = on              # Log statement duration
+  #    log_connections = on           # Log all connections
+  #    log_disconnections = on        # Log all disconnections
+  #    log_min_duration_statement = 1000  # Log slow queries (>1s)
+  #    - Send logs to centralized system for analysis
+  #    - Set up alerts for suspicious activity (e.g., mass deletes)
+  #
+  # 8. REGULAR MAINTENANCE
+  #    Automated tasks needed:
+  #    - VACUUM: Regular cleanup (vacuum analyze nightly)
+  #    - REINDEX: Periodic index rebuilds (monthly)
+  #    - Monitor disk usage and growth
+  #    - Update PostgreSQL regularly (security patches)
+  #
+  # 9. MONITORING & ALERTING
+  #    Track these metrics:
+  #    - Connection count (alert if approaching max)
+  #    - Disk usage (alert at 80%, 90%)
+  #    - Query performance (slow query log)
+  #    - Replication lag (if using replication)
+  #    - Backup success/failure status
+  #
+  # 10. HIGH AVAILABILITY (FOR CRITICAL DEPLOYMENTS)
+  #     Consider:
+  #     - PostgreSQL streaming replication (primary/replica)
+  #     - Automated failover (using pg_auto_failover or similar)
+  #     - Load balancing across replicas for read-heavy workloads
+  #     - Regular failover testing to verify procedures
+  #
+  # ─────────────────────────────────────────────────────────────────────────────
+  openfga-postgres:
+    image: postgres:16-alpine
+    environment:
+      # PRODUCTION: Use strong random password from secrets management
+      - POSTGRES_USER=openfga
+      # WARNING: "openfga" is weak. Use ${POSTGRES_PASSWORD} with min 32 chars
+      - POSTGRES_PASSWORD=openfga
+      - POSTGRES_DB=openfga
+      # PRODUCTION: Add SSL configuration
+      # - POSTGRES_INITDB_ARGS=-c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # Named volume for data persistence (good for local dev)
+      # PRODUCTION: Ensure regular backups are performed outside container
+      - openfga_data:/var/lib/postgresql/data
+      # PRODUCTION: Mount TLS certificates (read-only)
+      # - ./certs/postgres.crt:/var/lib/postgresql/server.crt:ro
+      # - ./certs/postgres.key:/var/lib/postgresql/server.key:ro
+      # PRODUCTION: Mount postgresql.conf for advanced tuning
+      # - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Keycloak OIDC Identity Provider
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Provides OIDC/OAuth2 authentication for SIOPV application testing
+  #
+  # FEATURES:
+  # - OIDC authentication for application integration testing
+  # - User management and role-based access control (RBAC)
+  # - OpenID Connect & OAuth2 compliance
+  # - Integration testing with real identity provider
+  #
+  # CONFIGURATION FOR DEVELOPMENT:
+  # - Admin console: http://localhost:8888/admin
+  # - Default credentials: admin / admin (dev-only)
+  # - OIDC Discovery: http://localhost:8888/.well-known/openid-configuration
+  # - Authorization endpoint: http://localhost:8888/realms/master/protocol/openid-connect/auth
+  # - Token endpoint: http://localhost:8888/realms/master/protocol/openid-connect/token
+  #
+  # PRODUCTION REQUIREMENTS:
+  # - Change default admin credentials (strong password, min 32 chars)
+  # - Enable TLS/HTTPS (port 443, not 8888)
+  # - Use external database (Postgres is already available)
+  # - Configure backup strategy for user data
+  # - Set up monitoring and audit logging
+  # - Restrict admin console access to VPN/internal networks
+  # - Configure proper realm settings (token lifespan, refresh timeout, etc.)
+  # - Enable CORS only for trusted domains
+  # - Configure rate limiting and bot protection
+  #
+  # INTEGRATION WITH SIOPV:
+  # - OpenFGA can use OIDC for authentication (see OpenFGA service comments)
+  # - SIOPV application should configure client credentials:
+  #   SIOPV_OIDC_PROVIDER_URL=http://keycloak:8888
+  #   SIOPV_OIDC_CLIENT_ID=siopv-client (create in Keycloak)
+  #   SIOPV_OIDC_CLIENT_SECRET=<secret-from-keycloak>
+  #
+  # ─────────────────────────────────────────────────────────────────────────────
+  keycloak:
+    image: keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      # PRODUCTION: Use strong random password from secrets management
+      - KEYCLOAK_ADMIN=admin
+      # WARNING: "admin" is a weak password for development only
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      # Optional: Use external Postgres instead of embedded H2
+      # - KC_DB=postgres
+      # - KC_DB_URL=jdbc:postgresql://openfga-postgres:5432/keycloak
+      # - KC_DB_USERNAME=keycloak
+      # - KC_DB_PASSWORD=<secure-password>
+    ports:
+      # 8888: Keycloak admin console and OIDC provider
+      # PRODUCTION: Remove if behind reverse proxy, use internal network only
+      - "8888:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # PRODUCTION: Add depends_on openfga-postgres if using external database
+    # depends_on:
+    #   openfga-postgres:
+    #     condition: service_healthy
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES & PERSISTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+# openfga_data: Named Docker volume storing PostgreSQL data
+# - Persists across container restarts
+# - Located at /var/lib/docker/volumes/openfga_data/_data (on host)
+# - PRODUCTION: Must be backed up regularly (daily or more frequently)
+# - Consider external storage (EBS, GCE persistent disks) for cloud deployments
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  openfga_data:

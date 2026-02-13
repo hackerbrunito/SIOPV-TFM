@@ -3,11 +3,12 @@
 Configuration loaded from environment variables and .env file.
 """
 
+import warnings
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -64,6 +65,38 @@ class Settings(BaseSettings):
     # === OpenFGA ===
     openfga_api_url: str | None = None
     openfga_store_id: str | None = None
+    openfga_api_token: SecretStr | None = None
+    openfga_authorization_model_id: str = ""
+    # === OpenFGA OIDC (client_credentials) ===
+    openfga_auth_method: Literal["none", "api_token", "client_credentials"] = "none"
+    openfga_client_id: str = ""
+    openfga_client_secret: SecretStr | None = None
+    openfga_api_audience: str = ""
+    openfga_api_token_issuer: str = ""
+
+    @model_validator(mode="after")
+    def _validate_openfga_auth(self) -> Self:
+        """Validate OpenFGA auth configuration consistency."""
+        if self.openfga_auth_method == "api_token" and not self.openfga_api_token:
+            warnings.warn(
+                "SIOPV_OPENFGA_AUTH_METHOD=api_token but SIOPV_OPENFGA_API_TOKEN is not set",
+                stacklevel=2,
+            )
+        if self.openfga_auth_method == "client_credentials":
+            missing = []
+            if not self.openfga_client_id:
+                missing.append("SIOPV_OPENFGA_CLIENT_ID")
+            if not self.openfga_client_secret:
+                missing.append("SIOPV_OPENFGA_CLIENT_SECRET")
+            if not self.openfga_api_token_issuer:
+                missing.append("SIOPV_OPENFGA_API_TOKEN_ISSUER")
+            if missing:
+                msg = (
+                    "SIOPV_OPENFGA_AUTH_METHOD=client_credentials but missing: "
+                    f"{', '.join(missing)}"
+                )
+                warnings.warn(msg, stacklevel=2)
+        return self
 
     # === ML Model ===
     model_path: Path = Path("./models/xgboost_risk_model.json")

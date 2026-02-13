@@ -158,6 +158,9 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --cov=src --cov-report=term-missing"
+markers = [
+    "real_openfga: Integration tests that require a real OpenFGA server",
+]
 
 [tool.coverage.run]
 source = ["src"]

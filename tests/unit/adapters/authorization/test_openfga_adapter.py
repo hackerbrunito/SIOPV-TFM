@@ -38,6 +38,13 @@ def mock_settings() -> MagicMock:
     settings = MagicMock()
     settings.openfga_api_url = "http://localhost:8080"
     settings.openfga_store_id = "test-store-id"
+    settings.openfga_api_token = None
+    settings.openfga_authorization_model_id = None
+    settings.openfga_auth_method = "none"
+    settings.openfga_client_id = None
+    settings.openfga_client_secret = None
+    settings.openfga_api_audience = None
+    settings.openfga_api_token_issuer = None
     settings.circuit_breaker_failure_threshold = 5
     settings.circuit_breaker_recovery_timeout = 60
     return settings
@@ -228,6 +235,250 @@ class TestOpenFGAAdapterInitialization:
         # Should not raise - close() without owned client is safe
         await adapter.close()
         assert adapter._owned_client is None
+
+
+class TestOpenFGAAdapterAuthentication:
+    """Tests for adapter authentication configuration."""
+
+    def test_init_stores_auth_method_none(self, mock_settings: MagicMock) -> None:
+        adapter = OpenFGAAdapter(mock_settings)
+        assert adapter._auth_method == "none"
+        assert adapter._api_token is None
+
+    def test_init_stores_api_token_settings(self, mock_settings: MagicMock) -> None:
+        mock_settings.openfga_auth_method = "api_token"
+        mock_settings.openfga_api_token = MagicMock()
+        mock_settings.openfga_api_token.get_secret_value.return_value = "test-token"
+        adapter = OpenFGAAdapter(mock_settings)
+        assert adapter._auth_method == "api_token"
+        assert adapter._api_token is not None
+
+    def test_init_stores_client_credentials_settings(self, mock_settings: MagicMock) -> None:
+        mock_settings.openfga_auth_method = "client_credentials"
+        mock_settings.openfga_client_id = "my-client-id"
+        mock_settings.openfga_client_secret = MagicMock()
+        mock_settings.openfga_client_secret.get_secret_value.return_value = "my-secret"
+        mock_settings.openfga_api_audience = "openfga-audience"
+        mock_settings.openfga_api_token_issuer = "https://idp.example.com/"
+        adapter = OpenFGAAdapter(mock_settings)
+        assert adapter._auth_method == "client_credentials"
+        assert adapter._client_id == "my-client-id"
+
+    def test_init_stores_authorization_model_id(self, mock_settings: MagicMock) -> None:
+        mock_settings.openfga_authorization_model_id = "01HXY..."
+        adapter = OpenFGAAdapter(mock_settings)
+        assert adapter._authorization_model_id == "01HXY..."
+
+    @pytest.mark.asyncio
+    async def test_initialize_with_api_token_creates_credentials(
+        self, mock_settings: MagicMock
+    ) -> None:
+        mock_settings.openfga_auth_method = "api_token"
+        mock_settings.openfga_api_token = MagicMock()
+        mock_settings.openfga_api_token.get_secret_value.return_value = "test-token"
+        adapter = OpenFGAAdapter(mock_settings)
+        with (
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.ClientConfiguration"
+            ) as mock_config,
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+        ):
+            mock_client_cls.return_value = AsyncMock()
+            await adapter.initialize()
+            assert "credentials" in mock_config.call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_initialize_no_auth_no_credentials(self, mock_settings: MagicMock) -> None:
+        adapter = OpenFGAAdapter(mock_settings)
+        with (
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.ClientConfiguration"
+            ) as mock_config,
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+        ):
+            mock_client_cls.return_value = AsyncMock()
+            await adapter.initialize()
+            assert "credentials" not in mock_config.call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_initialize_with_client_credentials_creates_credentials(
+        self, mock_settings: MagicMock
+    ) -> None:
+        """Test initialize creates Credentials object for client_credentials auth."""
+        mock_settings.openfga_auth_method = "client_credentials"
+        mock_settings.openfga_client_id = "my-client-id"
+        mock_settings.openfga_client_secret = MagicMock()
+        mock_settings.openfga_client_secret.get_secret_value.return_value = "my-secret"
+        mock_settings.openfga_api_audience = "openfga-audience"
+        mock_settings.openfga_api_token_issuer = "https://idp.example.com/"
+        adapter = OpenFGAAdapter(mock_settings)
+        with (
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.ClientConfiguration"
+            ) as mock_config,
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+            patch("siopv.adapters.authorization.openfga_adapter.Credentials") as mock_credentials,
+        ):
+            mock_client_cls.return_value = AsyncMock()
+            await adapter.initialize()
+            # Verify Credentials was called with OAuth2ClientCredentials
+            mock_credentials.assert_called_once()
+            assert "credentials" in mock_config.call_args[1]
+
+    @pytest.mark.asyncio
+    async def test_initialize_client_credentials_oauth_flow(self, mock_settings: MagicMock) -> None:
+        """Test initialize configures CredentialConfiguration for client_credentials auth."""
+        mock_settings.openfga_auth_method = "client_credentials"
+        mock_settings.openfga_client_id = "oauth-client"
+        mock_settings.openfga_client_secret = MagicMock()
+        mock_settings.openfga_client_secret.get_secret_value.return_value = "oauth-secret"
+        mock_settings.openfga_api_audience = "https://openfga.api"
+        mock_settings.openfga_api_token_issuer = "https://auth.provider.com/"
+        adapter = OpenFGAAdapter(mock_settings)
+        with (
+            patch("siopv.adapters.authorization.openfga_adapter.ClientConfiguration"),
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.CredentialConfiguration"
+            ) as mock_cred_config,
+        ):
+            mock_client_cls.return_value = AsyncMock()
+            await adapter.initialize()
+            # Verify CredentialConfiguration was configured with correct parameters
+            mock_cred_config.assert_called_once_with(
+                client_id="oauth-client",
+                client_secret="oauth-secret",
+                api_audience="https://openfga.api",
+                api_issuer="https://auth.provider.com/",
+            )
+
+    @pytest.mark.asyncio
+    async def test_client_credentials_token_refresh_config(self, mock_settings: MagicMock) -> None:
+        """Test token refresh validation.
+
+        Validates SDK config is passed correctly for OIDC client_credentials flow.
+
+        This test validates that:
+        1. The Credentials object is properly constructed with method='client_credentials'
+        2. The CredentialConfiguration contains all required OAuth2 parameters
+        3. The ClientConfiguration receives the credentials for token refresh
+        4. The api_issuer parameter (NOT api_token_issuer) is correctly mapped
+        """
+        mock_settings.openfga_auth_method = "client_credentials"
+        mock_settings.openfga_client_id = "test-client-id"
+        mock_settings.openfga_client_secret = MagicMock()
+        mock_settings.openfga_client_secret.get_secret_value.return_value = "test-client-secret"
+        mock_settings.openfga_api_audience = "https://openfga.example.com"
+        mock_settings.openfga_api_token_issuer = "https://idp.example.com/oauth2/token"
+
+        adapter = OpenFGAAdapter(mock_settings)
+
+        with (
+            patch("siopv.adapters.authorization.openfga_adapter.Credentials") as mock_credentials,
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.CredentialConfiguration"
+            ) as mock_cred_config,
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.ClientConfiguration"
+            ) as mock_client_config,
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_client_cls.return_value = mock_client_instance
+
+            # Create a mock CredentialConfiguration instance
+            mock_cred_config_instance = MagicMock()
+            mock_cred_config.return_value = mock_cred_config_instance
+
+            # Create a mock Credentials instance
+            mock_credentials_instance = MagicMock()
+            mock_credentials.return_value = mock_credentials_instance
+
+            await adapter.initialize()
+
+            # Verify CredentialConfiguration was created with correct OAuth2 parameters
+            mock_cred_config.assert_called_once_with(
+                client_id="test-client-id",
+                client_secret="test-client-secret",
+                api_audience="https://openfga.example.com",
+                # Verify api_issuer, not api_token_issuer
+                api_issuer="https://idp.example.com/oauth2/token",
+            )
+
+            # Verify Credentials was created with client_credentials method and the config
+            mock_credentials.assert_called_once_with(
+                method="client_credentials",
+                configuration=mock_cred_config_instance,
+            )
+
+            # Verify ClientConfiguration was created with the credentials
+            assert "credentials" in mock_client_config.call_args[1]
+            assert mock_client_config.call_args[1]["credentials"] == mock_credentials_instance
+
+            # Verify OpenFgaClient was initialized
+            mock_client_cls.assert_called_once()
+            mock_client_instance.__aenter__.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_client_credentials_token_refresh_config(
+        self, mock_settings: MagicMock
+    ) -> None:
+        """Test that client_credentials config enables automatic token refresh.
+
+        Verifies that the SDK is configured correctly for OIDC client_credentials
+        flow with all required parameters for automatic token refresh capability.
+        """
+        # Arrange
+        mock_settings.openfga_auth_method = "client_credentials"
+        mock_settings.openfga_client_id = "test-client-id"
+        mock_settings.openfga_client_secret = MagicMock()
+        mock_settings.openfga_client_secret.get_secret_value.return_value = "test-secret"
+        mock_settings.openfga_api_audience = "openfga-api"
+        mock_settings.openfga_api_token_issuer = "https://idp.example.com/"
+
+        adapter = OpenFGAAdapter(mock_settings)
+
+        # Act
+        with (
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.ClientConfiguration"
+            ) as mock_config,
+            patch("siopv.adapters.authorization.openfga_adapter.OpenFgaClient") as mock_client_cls,
+            patch("siopv.adapters.authorization.openfga_adapter.Credentials") as mock_credentials,
+            patch(
+                "siopv.adapters.authorization.openfga_adapter.CredentialConfiguration"
+            ) as mock_cred_config,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_client_cls.return_value = mock_client_instance
+
+            # Create mock instances
+            mock_cred_config_instance = MagicMock()
+            mock_cred_config.return_value = mock_cred_config_instance
+            mock_credentials_instance = MagicMock()
+            mock_credentials_instance.method = "client_credentials"
+            mock_credentials_instance.configuration = mock_cred_config_instance
+            mock_credentials.return_value = mock_credentials_instance
+
+            await adapter.initialize()
+
+            # Assert - verify credentials were configured
+            assert "credentials" in mock_config.call_args[1]
+            creds = mock_config.call_args[1]["credentials"]
+
+            # Verify it's using client_credentials method (enables auto-refresh)
+            assert creds.method == "client_credentials"
+
+            # Verify configuration has required fields for token refresh
+            assert creds.configuration == mock_cred_config_instance
+
+            # Verify CredentialConfiguration was created with correct parameters
+            mock_cred_config.assert_called_once_with(
+                client_id="test-client-id",
+                client_secret="test-secret",
+                api_audience="openfga-api",
+                api_issuer="https://idp.example.com/",  # SDK uses api_issuer, not api_token_issuer
+            )
 
 
 class TestAuthorizationPortCheck:

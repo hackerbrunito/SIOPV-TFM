@@ -86,3 +86,7 @@ Thumbs.db
 credentials.json
 secrets.json
 claude-verification-reports/
+
+# Agent reports and backups
+.ignorar/
+.env.bckp

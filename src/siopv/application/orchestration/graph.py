@@ -15,6 +15,7 @@ import structlog
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from siopv.application.orchestration.edges import (
     route_after_classify,
@@ -31,8 +32,6 @@ from siopv.application.orchestration.nodes import (
 from siopv.application.orchestration.state import PipelineState, create_initial_state
 
 if TYPE_CHECKING:
-    from langgraph.graph.state import CompiledStateGraph
-
     from siopv.application.ports import (
         AuthorizationPort,
         EPSSClientPort,

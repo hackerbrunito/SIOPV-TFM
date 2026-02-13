@@ -83,6 +83,8 @@ def create_authorization_adapter(settings: Settings) -> OpenFGAAdapter:
         "creating_authorization_adapter",
         api_url=settings.openfga_api_url,
         store_id=settings.openfga_store_id,
+        auth_method=getattr(settings, "openfga_auth_method", "none"),
+        model_id=getattr(settings, "openfga_authorization_model_id", None),
     )
 
     adapter = OpenFGAAdapter(settings)

@@ -9,6 +9,28 @@ from pydantic import ValidationError
 
 from siopv.infrastructure.config.settings import Settings, get_settings
 
+
+@pytest.fixture
+def settings_no_env_file(monkeypatch):  # noqa: ARG001
+    """Fixture that prevents Settings from loading the .env file."""
+    import os as os_module
+
+    env_path = Path(".env")
+    env_backup = Path(".env.test_backup")
+
+    # Temporarily rename .env to prevent loading
+    if env_path.exists():
+        os_module.rename(str(env_path), str(env_backup))
+        try:
+            yield
+        finally:
+            # Restore .env
+            if env_backup.exists():
+                os_module.rename(str(env_backup), str(env_path))
+    else:
+        yield
+
+
 # === Basic Settings Tests ===
 
 
@@ -48,6 +70,7 @@ def test_settings_from_env():
     assert settings.anthropic_api_key.get_secret_value() == "sk-ant-test123"
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_anthropic_api_key_required():
     """Test Settings requires anthropic_api_key."""
     # Arrange & Act & Assert
@@ -60,6 +83,7 @@ def test_settings_anthropic_api_key_required():
 # === API Configuration Tests ===
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_nvd_defaults():
     """Test NVD API default configuration."""
     # Arrange & Act
@@ -122,6 +146,7 @@ def test_settings_epss_defaults():
 # === Jira Configuration Tests ===
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_jira_optional():
     """Test Jira configuration is optional."""
     # Arrange & Act
@@ -367,6 +392,7 @@ def test_settings_log_level_literal_validation():
 # === OpenFGA Tests ===
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_openfga_optional():
     """Test OpenFGA configuration is optional."""
     # Arrange & Act
@@ -394,6 +420,58 @@ def test_settings_openfga_configured():
     # Assert
     assert settings.openfga_api_url == "http://localhost:8080"
     assert settings.openfga_store_id == "store-123"
+
+
+# === OpenFGA Authentication Tests ===
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_openfga_auth_defaults():
+    """Test OpenFGA auth fields have correct defaults."""
+    with patch.dict(os.environ, {"SIOPV_ANTHROPIC_API_KEY": "test-key"}, clear=True):
+        settings = Settings()
+
+    # Fields default to empty strings, not None
+    assert settings.openfga_authorization_model_id == ""
+    assert settings.openfga_auth_method == "none"
+    assert settings.openfga_client_id == ""
+    assert settings.openfga_api_audience == ""
+    assert settings.openfga_api_token_issuer == ""
+
+
+def test_settings_openfga_api_token_from_env():
+    """Test OpenFGA API token loads from env as SecretStr."""
+    env_vars = {
+        "SIOPV_ANTHROPIC_API_KEY": "test-key",
+        "SIOPV_OPENFGA_API_TOKEN": "my-secret-token",
+        "SIOPV_OPENFGA_AUTH_METHOD": "api_token",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        settings = Settings()
+
+    assert settings.openfga_api_token is not None
+    assert settings.openfga_api_token.get_secret_value() == "my-secret-token"
+    assert settings.openfga_auth_method == "api_token"
+
+
+def test_settings_openfga_oidc_from_env():
+    """Test OpenFGA OIDC settings load from env."""
+    env_vars = {
+        "SIOPV_ANTHROPIC_API_KEY": "test-key",
+        "SIOPV_OPENFGA_AUTH_METHOD": "client_credentials",
+        "SIOPV_OPENFGA_CLIENT_ID": "my-client-id",
+        "SIOPV_OPENFGA_CLIENT_SECRET": "my-client-secret",
+        "SIOPV_OPENFGA_API_AUDIENCE": "openfga-audience",
+        "SIOPV_OPENFGA_API_TOKEN_ISSUER": "https://idp.example.com/",
+    }
+    with patch.dict(os.environ, env_vars, clear=True):
+        settings = Settings()
+
+    assert settings.openfga_auth_method == "client_credentials"
+    assert settings.openfga_client_id == "my-client-id"
+    assert settings.openfga_client_secret.get_secret_value() == "my-client-secret"
+    assert settings.openfga_api_audience == "openfga-audience"
+    assert settings.openfga_api_token_issuer == "https://idp.example.com/"
 
 
 # === get_settings() Cache Tests ===
@@ -479,3 +557,110 @@ def test_settings_ignores_extra_fields():
     with patch.dict(os.environ, env_vars, clear=True):
         settings = Settings()
         assert settings.app_name == "SIOPV"  # Normal field works
+
+
+# === OpenFGA Validation Warning Tests ===
+
+
+def test_settings_openfga_auth_method_api_token_missing_token_warns():
+    """Test warning when api_token auth method but token not set."""
+    with (
+        pytest.warns(
+            UserWarning,
+            match="SIOPV_OPENFGA_AUTH_METHOD=api_token but SIOPV_OPENFGA_API_TOKEN is not set",
+        ),
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_OPENFGA_AUTH_METHOD": "api_token",
+            },
+            clear=True,
+        ),
+    ):
+        Settings()
+
+
+def test_settings_openfga_auth_method_client_credentials_missing_client_id_warns():
+    """Test warning when client_credentials auth method but client_id not set."""
+    expected_match = (
+        "SIOPV_OPENFGA_AUTH_METHOD=client_credentials but missing: SIOPV_OPENFGA_CLIENT_ID"
+    )
+    with (
+        pytest.warns(UserWarning, match=expected_match),
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_OPENFGA_AUTH_METHOD": "client_credentials",
+                "SIOPV_OPENFGA_CLIENT_SECRET": "secret",
+                "SIOPV_OPENFGA_API_TOKEN_ISSUER": "https://idp.example.com/",
+            },
+            clear=True,
+        ),
+    ):
+        Settings()
+
+
+def test_settings_openfga_auth_method_client_credentials_missing_client_secret_warns():
+    """Test warning when client_credentials auth method but client_secret not set."""
+    expected_match = (
+        "SIOPV_OPENFGA_AUTH_METHOD=client_credentials but missing: SIOPV_OPENFGA_CLIENT_SECRET"
+    )
+    with (
+        pytest.warns(UserWarning, match=expected_match),
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_OPENFGA_AUTH_METHOD": "client_credentials",
+                "SIOPV_OPENFGA_CLIENT_ID": "client-id",
+                "SIOPV_OPENFGA_API_TOKEN_ISSUER": "https://idp.example.com/",
+            },
+            clear=True,
+        ),
+    ):
+        Settings()
+
+
+def test_settings_openfga_auth_method_client_credentials_missing_issuer_warns():
+    """Test warning when client_credentials auth method but api_token_issuer not set."""
+    expected_match = (
+        "SIOPV_OPENFGA_AUTH_METHOD=client_credentials but missing: SIOPV_OPENFGA_API_TOKEN_ISSUER"
+    )
+    with (
+        pytest.warns(UserWarning, match=expected_match),
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_OPENFGA_AUTH_METHOD": "client_credentials",
+                "SIOPV_OPENFGA_CLIENT_ID": "client-id",
+                "SIOPV_OPENFGA_CLIENT_SECRET": "secret",
+            },
+            clear=True,
+        ),
+    ):
+        Settings()
+
+
+def test_settings_openfga_auth_method_client_credentials_missing_all_warns():
+    """Test warning when client_credentials auth method but all required fields missing."""
+    expected_match = (
+        "SIOPV_OPENFGA_AUTH_METHOD=client_credentials"
+        " but missing: SIOPV_OPENFGA_CLIENT_ID,"
+        " SIOPV_OPENFGA_CLIENT_SECRET,"
+        " SIOPV_OPENFGA_API_TOKEN_ISSUER"
+    )
+    with (
+        pytest.warns(UserWarning, match=expected_match),
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_OPENFGA_AUTH_METHOD": "client_credentials",
+            },
+            clear=True,
+        ),
+    ):
+        Settings()

@@ -29,6 +29,7 @@ from openfga_sdk.client.models import (
     ClientTuple,
     ClientWriteRequest,
 )
+from openfga_sdk.credentials import CredentialConfiguration, Credentials
 from openfga_sdk.exceptions import FgaValidationException
 from tenacity import (
     retry,
@@ -112,6 +113,13 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
         """
         self._api_url = settings.openfga_api_url
         self._store_id = settings.openfga_store_id
+        self._authorization_model_id = getattr(settings, "openfga_authorization_model_id", None)
+        self._auth_method = getattr(settings, "openfga_auth_method", "none")
+        self._api_token = getattr(settings, "openfga_api_token", None)
+        self._client_id = getattr(settings, "openfga_client_id", None)
+        self._client_secret = getattr(settings, "openfga_client_secret", None)
+        self._api_audience = getattr(settings, "openfga_api_audience", None)
+        self._api_token_issuer = getattr(settings, "openfga_api_token_issuer", None)
 
         # Circuit breaker for fault tolerance
         self._circuit_breaker = CircuitBreaker(
@@ -134,6 +142,8 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             "openfga_adapter_initialized",
             api_url=self._api_url,
             store_id=self._store_id,
+            auth_method=self._auth_method,
+            model_id=self._authorization_model_id,
         )
 
     async def initialize(self) -> None:
@@ -156,10 +166,33 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             logger.debug("openfga_using_external_client")
             return
 
-        configuration = ClientConfiguration(
-            api_url=self._api_url,
-            store_id=self._store_id,
-        )
+        config_kwargs: dict[str, Any] = {
+            "api_url": self._api_url,
+            "store_id": self._store_id,
+        }
+
+        if self._authorization_model_id:
+            config_kwargs["authorization_model_id"] = self._authorization_model_id
+
+        if self._auth_method == "api_token" and self._api_token:
+            config_kwargs["credentials"] = Credentials(
+                method="api_token",
+                configuration=CredentialConfiguration(
+                    api_token=self._api_token.get_secret_value(),
+                ),
+            )
+        elif self._auth_method == "client_credentials" and self._client_id and self._client_secret:
+            config_kwargs["credentials"] = Credentials(
+                method="client_credentials",
+                configuration=CredentialConfiguration(
+                    client_id=self._client_id,
+                    client_secret=self._client_secret.get_secret_value(),
+                    api_audience=self._api_audience or "",
+                    api_issuer=self._api_token_issuer or "",
+                ),
+            )
+
+        configuration = ClientConfiguration(**config_kwargs)
 
         self._owned_client = OpenFgaClient(configuration)
         await self._owned_client.__aenter__()
@@ -168,6 +201,7 @@ class OpenFGAAdapter(AuthorizationPort, AuthorizationStorePort, AuthorizationMod
             "openfga_client_connected",
             api_url=self._api_url,
             store_id=self._store_id,
+            auth_method=self._auth_method,
         )
 
     async def close(self) -> None:
