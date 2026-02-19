@@ -98,6 +98,27 @@ class Settings(BaseSettings):
                 warnings.warn(msg, stacklevel=2)
         return self
 
+    # === OIDC Authentication (API clients → SIOPV) ===
+    oidc_enabled: bool = False
+    oidc_issuer_url: str = ""  # e.g., http://localhost:8888/realms/siopv
+    oidc_audience: str = ""  # e.g., siopv-api
+    oidc_jwks_cache_ttl_seconds: int = 3600  # 1 hour JWKS cache
+    oidc_allowed_clock_skew_seconds: int = 30  # leeway for clock drift
+
+    @model_validator(mode="after")
+    def _validate_oidc_auth(self) -> Self:
+        """Validate OIDC authentication configuration consistency."""
+        if self.oidc_enabled:
+            missing = []
+            if not self.oidc_issuer_url:
+                missing.append("SIOPV_OIDC_ISSUER_URL")
+            if not self.oidc_audience:
+                missing.append("SIOPV_OIDC_AUDIENCE")
+            if missing:
+                msg = f"SIOPV_OIDC_ENABLED=true but missing required fields: {', '.join(missing)}"
+                raise ValueError(msg)
+        return self
+
     # === ML Model ===
     model_path: Path = Path("./models/xgboost_risk_model.json")
     model_base_path: Path = Path("./models")

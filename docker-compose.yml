@@ -200,13 +200,13 @@ services:
       # PRODUCTION: Enable SSL mode and use secret password
       - OPENFGA_DATASTORE_URI=postgres://openfga:openfga@openfga-postgres:5432/openfga?sslmode=disable
       # PRODUCTION: Implement proper authentication (change from preshared or make key strong)
-      - OPENFGA_AUTHN_METHOD=preshared
+      # Configurable auth method: 'preshared' (default) or 'oidc' (requires Keycloak)
+      - OPENFGA_AUTHN_METHOD=${OPENFGA_AUTHN_METHOD:-preshared}
       # WARNING: dev-key-siopv-local-1 is insecure. Use ${OPENFGA_API_KEY} from secrets
       - OPENFGA_AUTHN_PRESHARED_KEYS=dev-key-siopv-local-1
-      # Uncomment for OIDC mode (requires Keycloak setup):
-      # - OPENFGA_AUTHN_METHOD=oidc
-      # - OPENFGA_AUTHN_OIDC_ISSUER=http://keycloak:8080/realms/siopv
-      # - OPENFGA_AUTHN_OIDC_AUDIENCE=openfga-api
+      # OIDC authentication (enabled when OPENFGA_AUTHN_METHOD=oidc):
+      - OPENFGA_AUTHN_OIDC_ISSUER=${OPENFGA_AUTHN_OIDC_ISSUER:-http://keycloak:8080/realms/siopv}
+      - OPENFGA_AUTHN_OIDC_AUDIENCE=${OPENFGA_AUTHN_OIDC_AUDIENCE:-openfga-api}
       # PRODUCTION: Set to false (playground exposes authorization model)
       - OPENFGA_PLAYGROUND_ENABLED=true
       # JSON logging is good for centralized logging systems ✓

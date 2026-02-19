@@ -20,6 +20,7 @@ from siopv.application.ports.ml_classifier import (
     MLClassifierPort,
     ModelTrainerPort,
 )
+from siopv.application.ports.oidc_authentication import OIDCAuthenticationPort
 from siopv.application.ports.vector_store import VectorStorePort
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "MLClassifierPort",
     "ModelTrainerPort",
     "NVDClientPort",
+    "OIDCAuthenticationPort",
     "OSINTSearchClientPort",
     "VectorStorePort",
 ]
