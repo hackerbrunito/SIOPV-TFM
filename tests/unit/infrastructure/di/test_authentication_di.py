@@ -51,7 +51,7 @@ def _clear_cache() -> Generator[None, None, None]:
 @pytest.fixture(autouse=True)
 def _make_settings_hashable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make Settings hashable so lru_cache works in tests."""
-    monkeypatch.setattr(Settings, "__hash__", lambda self: id(self))
+    monkeypatch.setattr(Settings, "__hash__", id)
 
 
 # === Test create_oidc_adapter ===
