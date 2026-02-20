@@ -42,4 +42,7 @@ repos:
           - langchain-core>=0.3.0
           - langgraph>=0.2.0
           - langgraph-checkpoint-sqlite>=3.0.3
+          # Anthropic / Auth
+          - anthropic>=0.40.0
+          - PyJWT>=2.8.0
         files: ^src/

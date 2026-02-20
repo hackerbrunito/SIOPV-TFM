@@ -17,7 +17,7 @@ Context7 Verified PyJWT patterns:
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 import jwt
@@ -146,7 +146,7 @@ class KeycloakOIDCAdapter:
         client = await self._get_http_client()
         response = await client.get(url)
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     # ------------------------------------------------------------------
     # JWKS Fetching & Key Resolution
