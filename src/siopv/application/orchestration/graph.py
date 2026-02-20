@@ -24,6 +24,7 @@ from siopv.application.orchestration.edges import (
 from siopv.application.orchestration.nodes import (
     authorization_node,
     classify_node,
+    dlp_node,
     enrich_node,
     escalate_node,
     ingest_node,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
         OSINTSearchClientPort,
         VectorStorePort,
     )
+    from siopv.application.ports.dlp import DLPPort
     from siopv.application.ports.ml_classifier import MLClassifierPort
 
 logger = structlog.get_logger(__name__)
@@ -90,11 +92,12 @@ class PipelineGraphBuilder:
     Constructs a StateGraph with the following nodes:
     - authorize: Authorization gatekeeper (Phase 5 - Zero Trust)
     - ingest: Parse Trivy report (Phase 1)
+    - dlp: DLP guardrail — sanitize descriptions (Phase 6)
     - enrich: Context enrichment with CRAG (Phase 2)
     - classify: ML risk classification (Phase 3)
     - escalate: Human review escalation (Phase 4)
 
-    Flow: START -> authorize -> (if allowed) -> ingest -> enrich -> classify -> ...
+    Flow: START -> authorize -> (if allowed) -> ingest -> dlp -> enrich -> classify -> ...
 
     Conditional routing is based on:
     - Authorization check (Phase 5): If denied -> end with 403
@@ -106,6 +109,7 @@ class PipelineGraphBuilder:
         *,
         checkpoint_db_path: str | Path | None = None,
         authorization_port: AuthorizationPort | None = None,
+        dlp_port: DLPPort | None = None,
         nvd_client: NVDClientPort | None = None,
         epss_client: EPSSClientPort | None = None,
         github_client: GitHubAdvisoryClientPort | None = None,
@@ -118,6 +122,7 @@ class PipelineGraphBuilder:
         Args:
             checkpoint_db_path: Path to SQLite checkpoint database
             authorization_port: Authorization port for Phase 5 gatekeeper
+            dlp_port: DLP port for Phase 6 privacy guardrail
             nvd_client: NVD API client for enrichment
             epss_client: EPSS API client for enrichment
             github_client: GitHub Advisory client for enrichment
@@ -127,6 +132,7 @@ class PipelineGraphBuilder:
         """
         self._checkpoint_db_path = checkpoint_db_path or DEFAULT_CHECKPOINT_DB
         self._authorization_port = authorization_port
+        self._dlp_port = dlp_port
         self._nvd_client = nvd_client
         self._epss_client = epss_client
         self._github_client = github_client
@@ -176,6 +182,12 @@ class PipelineGraphBuilder:
         # Ingest node - wraps Phase 1 use case
         self._graph.add_node("ingest", ingest_node)
 
+        # DLP node - Phase 6 guardrail (sanitize vulnerability descriptions)
+        self._graph.add_node(
+            "dlp",
+            lambda state: dlp_node(state, dlp_port=self._dlp_port),
+        )
+
         # Enrich node - wraps Phase 2 use case with injected dependencies
         self._graph.add_node(
             "enrich",
@@ -200,7 +212,7 @@ class PipelineGraphBuilder:
 
         logger.debug(
             "pipeline_nodes_added",
-            nodes=["authorize", "ingest", "enrich", "classify", "escalate"],
+            nodes=["authorize", "ingest", "dlp", "enrich", "classify", "escalate"],
         )
 
     def _add_edges(self) -> None:
@@ -210,7 +222,7 @@ class PipelineGraphBuilder:
             msg = "Graph not initialized. Call build() first."
             raise RuntimeError(msg)
 
-        # Flow: START -> authorize -> (conditional) -> ingest -> enrich -> classify
+        # Flow: START -> authorize -> (conditional) -> ingest -> dlp -> enrich -> classify
         self._graph.add_edge(START, "authorize")
 
         # Conditional routing after authorization (Phase 5 gatekeeper)
@@ -223,8 +235,9 @@ class PipelineGraphBuilder:
             },
         )
 
-        # Linear flow after authorization: ingest -> enrich -> classify
-        self._graph.add_edge("ingest", "enrich")
+        # Linear flow: ingest -> dlp (Phase 6) -> enrich -> classify
+        self._graph.add_edge("ingest", "dlp")
+        self._graph.add_edge("dlp", "enrich")
         self._graph.add_edge("enrich", "classify")
 
         # Conditional routing after classify based on uncertainty
@@ -346,6 +359,7 @@ def create_pipeline_graph(
     *,
     checkpoint_db_path: str | Path | None = None,
     authorization_port: AuthorizationPort | None = None,
+    dlp_port: DLPPort | None = None,
     nvd_client: NVDClientPort | None = None,
     epss_client: EPSSClientPort | None = None,
     github_client: GitHubAdvisoryClientPort | None = None,
@@ -359,6 +373,7 @@ def create_pipeline_graph(
     Args:
         checkpoint_db_path: Path to SQLite checkpoint database
         authorization_port: Authorization port for Phase 5 gatekeeper
+        dlp_port: DLP port for Phase 6 privacy guardrail
         nvd_client: NVD API client for enrichment
         epss_client: EPSS API client for enrichment
         github_client: GitHub Advisory client for enrichment
@@ -373,6 +388,7 @@ def create_pipeline_graph(
     builder = PipelineGraphBuilder(
         checkpoint_db_path=checkpoint_db_path,
         authorization_port=authorization_port,
+        dlp_port=dlp_port,
         nvd_client=nvd_client,
         epss_client=epss_client,
         github_client=github_client,
@@ -392,6 +408,7 @@ def run_pipeline(
     project_id: str | None = None,
     checkpoint_db_path: str | Path | None = None,
     authorization_port: AuthorizationPort | None = None,
+    dlp_port: DLPPort | None = None,
     classifier: MLClassifierPort | None = None,
 ) -> PipelineState:
     """Convenience function to run the full pipeline on a Trivy report.
@@ -403,6 +420,7 @@ def run_pipeline(
         project_id: Optional project ID for authorization context (Phase 5)
         checkpoint_db_path: Path to checkpoint database
         authorization_port: Optional authorization port for Phase 5 gatekeeper
+        dlp_port: Optional DLP port for Phase 6 privacy guardrail
         classifier: Optional ML classifier
 
     Returns:
@@ -421,6 +439,7 @@ def run_pipeline(
     graph = create_pipeline_graph(
         checkpoint_db_path=checkpoint_db_path,
         authorization_port=authorization_port,
+        dlp_port=dlp_port,
         classifier=classifier,
         with_checkpointer=checkpoint_db_path is not None,
     )

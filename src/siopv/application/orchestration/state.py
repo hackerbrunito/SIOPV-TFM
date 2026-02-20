@@ -66,6 +66,9 @@ class PipelineState(TypedDict, total=False):
     processed_count: int
     errors: Annotated[list[str], operator.add]
 
+    # Phase 6 - DLP/Privacy
+    dlp_result: dict[str, object] | None
+
     # Metadata
     thread_id: str
     current_node: str
@@ -187,6 +190,8 @@ def create_initial_state(
         llm_confidence={},
         processed_count=0,
         errors=[],
+        # Phase 6 - DLP/Privacy
+        dlp_result=None,
         # Metadata
         thread_id=thread_id or str(uuid.uuid4()),
         current_node="start",

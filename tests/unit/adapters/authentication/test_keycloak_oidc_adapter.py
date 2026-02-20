@@ -431,11 +431,11 @@ class TestTokenValidation:
             await adapter.validate_token("not-a-valid-jwt")
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("create_jwt_token")
     @respx.mock
     async def test_validate_token_missing_kid(
         self,
         settings: Settings,
-        create_jwt_token: Any,
         valid_token_payload: dict[str, Any],
         jwks_data: dict[str, Any],
     ) -> None:
