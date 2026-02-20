@@ -298,7 +298,7 @@ class TestAuthenticateAndAuthorize:
 
         assert identity == sample_identity
         assert isinstance(context, AuthorizationContext)
-        assert context.user_id == "service-siopv-client"
+        assert context.user.value == "service-siopv-client"
         assert context.resource == resource
         assert context.action == action
 
@@ -333,7 +333,7 @@ class TestAuthenticateAndAuthorize:
         )
 
         # Should use service- prefix convention
-        assert context.user_id == "service-test-client"
+        assert context.user.value == "service-test-client"
 
     @pytest.mark.asyncio
     async def test_authenticate_and_authorize_creates_correct_context(
@@ -490,13 +490,19 @@ class TestSecurityNoTokenLogging:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Test authenticate logs only PII-safe metadata."""
+        import logging
+
         import structlog
 
+        # Route structlog through stdlib so pytest caplog can capture records
         structlog.configure(
             processors=[
-                structlog.processors.add_log_level,
+                structlog.stdlib.add_log_level,
                 structlog.processors.KeyValueRenderer(),
             ],
+            wrapper_class=structlog.stdlib.BoundLogger,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            cache_logger_on_first_use=False,
         )
 
         mock_port = AsyncMock()
@@ -505,7 +511,8 @@ class TestSecurityNoTokenLogging:
 
         middleware = OIDCAuthenticationMiddleware(mock_port, settings_enabled)
 
-        await middleware.authenticate("Bearer token")
+        with caplog.at_level(logging.INFO):
+            await middleware.authenticate("Bearer token")
 
         # Should log client_id, issuer (metadata), but never raw token
         log_output = "\n".join(record.getMessage() for record in caplog.records)
