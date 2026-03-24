@@ -1,0 +1,206 @@
+[project]
+name = "siopv"
+version = "0.1.0"
+description = "Sistema Inteligente de Orquestación y Priorización de Vulnerabilidades"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Carlos Val Souto" }]
+keywords = ["security", "vulnerabilities", "ml", "langraph", "ci-cd"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    # Core AI/ML
+    "langgraph>=1.1.3",
+    "langchain>=0.3.0",
+    "anthropic>=0.40.0",
+    "chromadb>=0.5.0",
+    # Machine Learning
+    "scikit-learn>=1.4.0",
+    "xgboost>=2.0.0",
+    "shap>=0.45.0",
+    "lime>=0.2.0",
+    "imbalanced-learn>=0.12.0",  # SMOTE
+    "optuna>=3.5.0",
+    # Data Validation
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    # HTTP & APIs
+    "httpx>=0.27.0",
+    "tenacity>=8.2.0",
+    # Privacy/DLP
+    "presidio-analyzer>=2.2.0",
+    "presidio-anonymizer>=2.2.0",
+    "spacy>=3.7.0",
+    "en-core-web-lg>=3.8.0",
+    # Authorization
+    "openfga-sdk>=0.6.0",
+    # Authentication (JWT/OIDC)
+    "PyJWT[crypto]>=2.12.0",
+    # Webhook (inbound API)
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    # CLI & Dashboard
+    "typer[all]>=0.12.0",
+    "streamlit>=1.40.0",
+    "plotly>=6.0.0",
+    "streamlit-flow-component>=1.6.1,<2.0",
+    "pillow>=12.1.1",
+    "rich>=13.0.0",
+    # Reports
+    "fpdf2>=2.7.0",
+    # Logging & Observability
+    "structlog>=24.0.0",
+    # Database
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.20.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "langgraph-checkpoint-sqlite>=3.0.3",
+    # Security: transitive dependency lower bounds (CVE patches)
+    "cryptography>=46.0.5",
+    "orjson>=3.11.6",
+    "protobuf>=6.33.5",
+    "tornado>=6.5.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-xdist>=3.5.0",
+    "ruff>=0.4.0",
+    "mypy>=1.9.0",
+    "pre-commit>=3.6.0",
+    "respx>=0.21.0",  # httpx mocking
+]
+
+[project.scripts]
+siopv = "siopv.interfaces.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/siopv"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/siopv"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "DTZ",  # flake8-datetimez
+    "T10",  # flake8-debugger
+    "EM",   # flake8-errmsg
+    "ISC",  # flake8-implicit-str-concat
+    "ICN",  # flake8-import-conventions
+    "PIE",  # flake8-pie
+    "PT",   # flake8-pytest-style
+    "Q",    # flake8-quotes
+    "RSE",  # flake8-raise
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "TID",  # flake8-tidy-imports
+    "ARG",  # flake8-unused-arguments
+    "PL",   # pylint
+    "TRY",  # tryceratops
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "PLR0913",  # too many arguments
+    "TRY003",   # long exception messages
+    "ISC001",   # implicit-str-concat (conflicts with formatter)
+    "COM812",   # missing-trailing-comma (conflicts with formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["siopv"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/domain/learning/*.py" = ["N803", "N806"]
+"src/siopv/adapters/ml/*.py" = ["N803", "N806"]  # ML convention: X, y for features/labels
+"src/siopv/application/ports/ml_classifier.py" = ["N803", "N806"]  # ML interface matches adapters
+"tests/**/*.py" = [
+    "PLR2004",  # Magic values acceptable in tests
+    "PLC0415",  # Import in function acceptable in tests
+    "EM101",    # Exception literals acceptable in tests
+    "TRY301",   # Raise in try acceptable in tests
+    "N803",     # lowercase argument names acceptable in tests
+    "N806",     # lowercase variables in functions acceptable in tests
+    "PLW0108",  # lambda-assignment: lambda wrappers needed for monkeypatch.setattr descriptor protocol
+]
+
+[tool.uv.sources]
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl" }
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+enable_error_code = ["ignore-without-code"]
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastapi.*",
+    "imblearn.*",
+    "lime.*",
+    "openfga_sdk.*",
+    "presidio_analyzer.*",
+    "presidio_anonymizer.*",
+    "shap.*",
+    "sklearn.*",
+    "spacy.*",
+    "streamlit.*",
+    "streamlit_flow.*",
+    "plotly.*",
+    "uvicorn.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["siopv.interfaces.dashboard.*", "siopv.adapters.inbound.*"]
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --cov=src --cov-report=term-missing"
+markers = [
+    "real_openfga: Integration tests that require a real OpenFGA server",
+    "real_keycloak: Integration tests that require a real Keycloak server",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

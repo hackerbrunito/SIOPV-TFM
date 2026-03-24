@@ -1,0 +1,52 @@
+# Pre-commit configuration for SIOPV
+# See https://pre-commit.com for more information
+
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # Ruff - Fast Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      # Run the linter with auto-fix
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+      # Run the formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # MyPy - Static type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        args: [--strict]
+        additional_dependencies:
+          # Type stubs
+          - types-requests
+          - types-python-dateutil
+          # Core dependencies with type stubs
+          - pydantic>=2.0.0
+          - pydantic-settings>=2.0.0
+          - structlog>=24.0.0
+          - httpx>=0.27.0
+          - tenacity>=8.2.0
+          - numpy>=1.24.0
+          # ML/AI dependencies
+          - xgboost>=2.0.0
+          - optuna>=3.5.0
+          - chromadb>=0.5.0
+          - matplotlib>=3.8.0
+          - fpdf2>=2.8.0
+          # LangChain/LangGraph
+          - langchain-core>=0.3.0
+          - langgraph>=0.2.0
+          - langgraph-checkpoint-sqlite>=3.0.3
+          # Anthropic / Auth
+          - anthropic>=0.40.0
+          - PyJWT>=2.8.0
+          # Dashboard visualization
+          - pandas-stubs>=2.0.0
+        files: ^src/

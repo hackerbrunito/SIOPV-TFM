@@ -1,0 +1,31 @@
+model
+  schema 1.1
+
+type user
+
+type organization
+  relations
+    define admin: [user]
+    define member: [user] or admin
+
+type project
+  relations
+    define organization: [organization]
+    define owner: [user] or admin from organization
+    define viewer: [user] or owner or member from organization
+    define analyst: [user] or owner
+    define auditor: [user] or admin from organization
+
+type vulnerability
+  relations
+    define project: [project]
+    define owner: [user] or owner from project
+    define viewer: [user] or viewer from project
+    define analyst: [user] or analyst from project
+
+type report
+  relations
+    define project: [project]
+    define owner: [user] or owner from project
+    define viewer: [user] or viewer from project or auditor from project
+    define auditor: [user] or auditor from project
