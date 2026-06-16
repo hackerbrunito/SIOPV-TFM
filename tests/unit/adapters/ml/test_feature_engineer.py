@@ -287,7 +287,7 @@ class TestExtractFeatures:
 
         array = result.to_array()
         assert isinstance(array, np.ndarray)
-        assert array.shape == (14,)
+        assert array.shape == (17,)
         assert array.dtype == np.float32
         assert not np.any(np.isnan(array))
 

@@ -49,6 +49,9 @@ def sample_feature_vector() -> MLFeatureVector:
         epss_percentile=0.999,
         days_since_publication=1000,
         has_exploit_ref=1,
+        has_public_exploit=1,
+        has_metasploit=1,
+        num_references=8,
         cwe_category=0.78,
     )
 
@@ -78,6 +81,9 @@ def sample_training_data() -> tuple[list[MLFeatureVector], list[int]]:
                 epss_percentile=0.95 + np.random.random() * 0.05,
                 days_since_publication=500 + int(np.random.random() * 500),
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.75 + np.random.random() * 0.1,
             )
         )
@@ -101,6 +107,9 @@ def sample_training_data() -> tuple[list[MLFeatureVector], list[int]]:
                 epss_percentile=0.1 + np.random.random() * 0.2,
                 days_since_publication=1000 + int(np.random.random() * 500),
                 has_exploit_ref=0,
+                has_public_exploit=0,
+                has_metasploit=0,
+                num_references=2,
                 cwe_category=0.3 + np.random.random() * 0.1,
             )
         )
@@ -116,9 +125,27 @@ def mock_xgb_model() -> Mock:
     # Mock predict_proba to return realistic probabilities
     mock.predict_proba.return_value = np.array([[0.15, 0.85]])
     mock.predict.return_value = np.array([1])
-    # Mock feature importance (14 features)
+    # Mock feature importance (17 features)
     mock.feature_importances_ = np.array(
-        [0.15, 0.08, 0.03, 0.05, 0.02, 0.04, 0.06, 0.05, 0.04, 0.25, 0.10, 0.03, 0.07, 0.03]
+        [
+            0.15,
+            0.08,
+            0.03,
+            0.05,
+            0.02,
+            0.04,
+            0.06,
+            0.05,
+            0.04,
+            0.25,
+            0.10,
+            0.03,
+            0.07,
+            0.04,
+            0.05,
+            0.06,
+            0.03,
+        ]
     )
     mock.save_model = Mock()
     mock.load_model = Mock()
@@ -146,6 +173,9 @@ def mock_shap_values() -> SHAPValues:
             0.10,
             -0.02,
             0.12,
+            0.07,
+            0.06,
+            0.09,
             0.03,
         ],
         base_value=0.35,
@@ -251,10 +281,11 @@ def _generate_valid_feature_array(n_samples: int, seed: int = 42) -> np.ndarray:
 
     Feature order: cvss_base_score, attack_vector, attack_complexity, privileges_required,
     user_interaction, scope, confidentiality_impact, integrity_impact, availability_impact,
-    epss_score, epss_percentile, days_since_publication, has_exploit_ref, cwe_category
+    epss_score, epss_percentile, days_since_publication, has_exploit_ref, has_public_exploit,
+    has_metasploit, num_references, cwe_category
     """
     rng = np.random.default_rng(seed)
-    data = np.zeros((n_samples, 14), dtype=np.float32)
+    data = np.zeros((n_samples, 17), dtype=np.float32)
 
     for i in range(n_samples):
         data[i] = [
@@ -271,6 +302,9 @@ def _generate_valid_feature_array(n_samples: int, seed: int = 42) -> np.ndarray:
             rng.uniform(0.0, 1.0),  # epss_percentile (0-1)
             rng.integers(0, 1000),  # days_since_publication (>=0)
             rng.integers(0, 2),  # has_exploit_ref (0-1)
+            rng.integers(0, 2),  # has_public_exploit (0-1)
+            rng.integers(0, 2),  # has_metasploit (0-1)
+            rng.integers(0, 20),  # num_references (>=0)
             rng.uniform(0.0, 1.0),  # cwe_category (target encoded float)
         ]
 
@@ -537,6 +571,9 @@ class TestXGBoostClassifierPrediction:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(3)
@@ -586,8 +623,8 @@ class TestXGBoostClassifierXAI:
         shap_values = classifier.get_shap_values(sample_feature_vector)
 
         assert isinstance(shap_values, SHAPValues)
-        assert len(shap_values.feature_names) == 14
-        assert len(shap_values.shap_values) == 14
+        assert len(shap_values.feature_names) == 17
+        assert len(shap_values.shap_values) == 17
         assert shap_values.base_value is not None
 
     @patch("siopv.adapters.ml.xgboost_classifier.LIMEExplainer")
@@ -615,7 +652,7 @@ class TestXGBoostClassifierXAI:
 
         importance = classifier.get_feature_importance()
 
-        assert len(importance) == 14
+        assert len(importance) == 17
         assert all(name in importance for name in DEFAULT_FEATURE_NAMES)
 
     @patch("siopv.adapters.ml.xgboost_classifier.SHAPExplainer")

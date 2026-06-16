@@ -44,6 +44,9 @@ def feature_names() -> list[str]:
         "epss_percentile",
         "days_since_publication",
         "has_exploit_ref",
+        "has_public_exploit",
+        "has_metasploit",
+        "num_references",
         "cwe_category",
     ]
 
@@ -66,6 +69,9 @@ def sample_feature_vector() -> MLFeatureVector:
         epss_percentile=0.999,
         days_since_publication=1000,
         has_exploit_ref=1,
+        has_public_exploit=1,
+        has_metasploit=1,
+        num_references=8,
         cwe_category=0.78,
     )
 
@@ -83,7 +89,7 @@ def mock_tree_explainer() -> Mock:
     # For binary classification: list of [negative_class_values, positive_class_values]
     # Each is shape (n_samples, n_features)
     mock.shap_values.return_value = [
-        np.array([[0.0] * 14]),  # Negative class (we ignore this)
+        np.array([[0.0] * 17]),  # Negative class (we ignore this)
         np.array(
             [
                 [
@@ -100,6 +106,9 @@ def mock_tree_explainer() -> Mock:
                     0.10,
                     -0.02,
                     0.12,
+                    0.07,
+                    0.06,
+                    0.09,
                     0.03,
                 ]
             ]
@@ -152,7 +161,7 @@ class TestSHAPExplainerExplanations:
         # Setup: TreeExplainer returns list format [neg_class, pos_class]
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.array([[0.0] * 14]),  # Negative class
+            np.array([[0.0] * 17]),  # Negative class
             np.array(
                 [
                     [
@@ -169,6 +178,9 @@ class TestSHAPExplainerExplanations:
                         0.10,
                         -0.02,
                         0.12,
+                        0.07,
+                        0.06,
+                        0.09,
                         0.03,
                     ]
                 ]
@@ -181,8 +193,8 @@ class TestSHAPExplainerExplanations:
         shap_values = explainer.explain(sample_feature_vector)
 
         assert isinstance(shap_values, SHAPValues)
-        assert len(shap_values.feature_names) == 14
-        assert len(shap_values.shap_values) == 14
+        assert len(shap_values.feature_names) == 17
+        assert len(shap_values.shap_values) == 17
         assert shap_values.base_value == 0.35  # Positive class expected value
         # Verify specific SHAP values
         assert shap_values.shap_values[0] == pytest.approx(0.15)  # cvss_base_score
@@ -211,6 +223,9 @@ class TestSHAPExplainerExplanations:
                     0.10,
                     -0.02,
                     0.12,
+                    0.07,
+                    0.06,
+                    0.09,
                     0.03,
                 ]
             ]
@@ -222,7 +237,7 @@ class TestSHAPExplainerExplanations:
         shap_values = explainer.explain(sample_feature_vector)
 
         assert isinstance(shap_values, SHAPValues)
-        assert len(shap_values.shap_values) == 14
+        assert len(shap_values.shap_values) == 17
         assert shap_values.base_value == 0.35
 
     @patch("siopv.adapters.ml.shap_explainer.shap.TreeExplainer")
@@ -230,11 +245,11 @@ class TestSHAPExplainerExplanations:
         """Test explaining multiple predictions."""
         # Setup batch SHAP values
         np.random.seed(42)
-        batch_shap_values = np.random.randn(3, 14)
+        batch_shap_values = np.random.randn(3, 17)
 
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((3, 14)),  # Negative class
+            np.zeros((3, 17)),  # Negative class
             batch_shap_values,  # Positive class
         ]
         mock_tree_explainer.expected_value = np.array([0.65, 0.35])
@@ -256,6 +271,9 @@ class TestSHAPExplainerExplanations:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(3)
@@ -266,7 +284,7 @@ class TestSHAPExplainerExplanations:
 
         assert len(shap_values_list) == 3
         assert all(isinstance(sv, SHAPValues) for sv in shap_values_list)
-        assert all(len(sv.shap_values) == 14 for sv in shap_values_list)
+        assert all(len(sv.shap_values) == 17 for sv in shap_values_list)
         assert all(sv.base_value == 0.35 for sv in shap_values_list)
 
     @patch("siopv.adapters.ml.shap_explainer.shap.TreeExplainer")
@@ -295,12 +313,12 @@ class TestSHAPExplainerGlobalImportance:
         """Test calculating global feature importance."""
         # Create SHAP values where epss_score (index 9) has highest mean absolute value
         np.random.seed(42)
-        shap_array = np.random.randn(5, 14) * 0.1
+        shap_array = np.random.randn(5, 17) * 0.1
         shap_array[:, 9] = 0.5  # Make epss_score most important
 
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((5, 14)),
+            np.zeros((5, 17)),
             shap_array,
         ]
         mock_tree_explainer.expected_value = np.array([0.65, 0.35])
@@ -322,6 +340,9 @@ class TestSHAPExplainerGlobalImportance:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(5)
@@ -330,7 +351,7 @@ class TestSHAPExplainerGlobalImportance:
         explainer = SHAPExplainer(model=mock_xgboost_model, feature_names=feature_names)
         importance = explainer.get_global_importance(feature_vectors)
 
-        assert len(importance) == 14
+        assert len(importance) == 17
         assert all(name in importance for name in feature_names)
         assert "epss_score" in importance
         # epss_score should have highest importance
@@ -360,11 +381,11 @@ class TestSHAPExplainerSummaryData:
     ):
         """Test generating summary plot data."""
         np.random.seed(42)
-        shap_array = np.random.randn(3, 14)
+        shap_array = np.random.randn(3, 17)
 
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((3, 14)),
+            np.zeros((3, 17)),
             shap_array,
         ]
         mock_tree_explainer.expected_value = np.array([0.65, 0.35])
@@ -386,6 +407,9 @@ class TestSHAPExplainerSummaryData:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(3)
@@ -394,8 +418,8 @@ class TestSHAPExplainerSummaryData:
         explainer = SHAPExplainer(model=mock_xgboost_model, feature_names=feature_names)
         shap_values, feature_matrix, names = explainer.generate_summary_data(feature_vectors)
 
-        assert shap_values.shape == (3, 14)
-        assert feature_matrix.shape == (3, 14)
+        assert shap_values.shape == (3, 17)
+        assert feature_matrix.shape == (3, 17)
         assert names == feature_names
 
     def test_generate_summary_data_empty(self, mock_xgboost_model, feature_names):
@@ -426,8 +450,8 @@ class TestSHAPExplainerLazyInit:
         mock_tree_explainer = Mock()
         # FIXED: Use 2D arrays (n_samples, n_features) instead of 1D
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
-            np.random.randn(1, 14),
+            np.zeros((1, 17)),
+            np.random.randn(1, 17),
         ]
         mock_tree_explainer.expected_value = np.array([0.65, 0.35])
         mock_tree_explainer_class.return_value = mock_tree_explainer
@@ -456,8 +480,8 @@ class TestSHAPExplainerLazyInit:
         mock_tree_explainer = Mock()
         # FIXED: Use 2D arrays (n_samples, n_features) instead of 1D
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
-            np.random.randn(1, 14),
+            np.zeros((1, 17)),
+            np.random.randn(1, 17),
         ]
         mock_tree_explainer.expected_value = np.array([0.65, 0.35])
         mock_tree_explainer_class.return_value = mock_tree_explainer
@@ -487,8 +511,8 @@ class TestSHAPExplainerEdgeCases:
         """Test explanation with all-zero SHAP values."""
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
-            np.zeros((1, 14)),
+            np.zeros((1, 17)),
+            np.zeros((1, 17)),
         ]
         mock_tree_explainer.expected_value = np.array([0.5, 0.5])
         mock_tree_explainer_class.return_value = mock_tree_explainer
@@ -506,8 +530,8 @@ class TestSHAPExplainerEdgeCases:
         """Test explanation with negative SHAP values."""
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
-            np.full((1, 14), -0.1),  # All negative
+            np.zeros((1, 17)),
+            np.full((1, 17), -0.1),  # All negative
         ]
         mock_tree_explainer.expected_value = np.array([0.5, 0.5])
         mock_tree_explainer_class.return_value = mock_tree_explainer
@@ -525,8 +549,8 @@ class TestSHAPExplainerEdgeCases:
         """Test explanation with large SHAP values."""
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
-            np.full((1, 14), 10.0),  # Large positive values
+            np.zeros((1, 17)),
+            np.full((1, 17), 10.0),  # Large positive values
         ]
         mock_tree_explainer.expected_value = np.array([0.5, 0.5])
         mock_tree_explainer_class.return_value = mock_tree_explainer
@@ -552,7 +576,7 @@ class TestSHAPExplainerIntegration:
         # Setup realistic SHAP values
         mock_tree_explainer = Mock()
         mock_tree_explainer.shap_values.return_value = [
-            np.zeros((1, 14)),
+            np.zeros((1, 17)),
             np.array(
                 [
                     [
@@ -569,6 +593,9 @@ class TestSHAPExplainerIntegration:
                         0.10,  # epss_percentile
                         -0.02,  # days_since_publication (negative)
                         0.12,  # has_exploit_ref
+                        0.07,  # has_public_exploit
+                        0.06,  # has_metasploit
+                        0.09,  # num_references
                         0.03,  # cwe_category
                     ]
                 ]
@@ -596,6 +623,9 @@ class TestSHAPExplainerIntegration:
             epss_percentile=0.999,
             days_since_publication=1000,
             has_exploit_ref=1,
+            has_public_exploit=1,
+            has_metasploit=1,
+            num_references=8,
             cwe_category=0.78,
         )
 
@@ -604,8 +634,8 @@ class TestSHAPExplainerIntegration:
 
         # Verify explanation quality
         assert isinstance(shap_values, SHAPValues)
-        assert len(shap_values.feature_names) == 14
-        assert len(shap_values.shap_values) == 14
+        assert len(shap_values.feature_names) == 17
+        assert len(shap_values.shap_values) == 17
         assert shap_values.base_value == 0.35
 
         # Verify top contributors

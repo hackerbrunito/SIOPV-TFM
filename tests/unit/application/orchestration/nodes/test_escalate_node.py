@@ -1,4 +1,9 @@
-"""Tests for escalate_node with Phase 7 HITL interrupt support."""
+"""Tests for escalate_node (non-blocking HITL flagging).
+
+The node tags uncertain CVEs for human review and returns state updates; it does
+NOT call interrupt() and never blocks the pipeline. Human decisions are applied
+out-of-band (Streamlit dashboard / webhook).
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from siopv.application.orchestration.nodes.escalate_node import (
+    _build_escalation_summary,
     _calculate_escalation_level,
     escalate_node,
     get_escalation_summary,
@@ -97,15 +103,16 @@ class TestEscalateNode:
         assert result["escalation_required"] is False
         assert len(result["escalated_cves"]) == 0
 
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_escalate_node_calls_interrupt_with_candidates(
+    def test_escalate_node_flags_candidates_without_interrupt(
         self,
-        mock_interrupt: object,
         mock_classification_low_confidence: ClassificationResult,
     ) -> None:
-        """Test that escalate_node calls interrupt() when candidates exist."""
-        mock_interrupt.return_value = {"decision": "approve"}  # type: ignore[union-attr]
+        """Candidates are flagged for review and the pipeline continues (no interrupt).
 
+        Phase B redesign: escalate_node is non-blocking — it tags CVEs and returns
+        state updates. Human review happens out-of-band (dashboard/webhook), so the
+        node never calls ``interrupt()`` and never blocks the CI/CD pipeline.
+        """
         state = {
             **create_initial_state(),
             "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
@@ -119,54 +126,15 @@ class TestEscalateNode:
             threshold_config=_DEFAULT_THRESHOLD_CONFIG,
         )
 
-        mock_interrupt.assert_called_once()  # type: ignore[union-attr]
         assert result["escalation_required"] is True
-        assert result["human_decision"] == "approve"
         assert "CVE-2024-2222" in result["escalated_cves"]
+        assert result["current_node"] == "escalate"
 
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_interrupt_receives_correct_data_structure(
+    def test_escalate_node_returns_review_metadata(
         self,
-        mock_interrupt: object,
         mock_classification_low_confidence: ClassificationResult,
     ) -> None:
-        """Test that interrupt() receives a JSON-serializable dict with expected keys."""
-        mock_interrupt.return_value = {"decision": "reject"}  # type: ignore[union-attr]
-
-        state = {
-            **create_initial_state(),
-            "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
-            "llm_confidence": {"CVE-2024-2222": 0.4},
-        }
-
-        escalate_node(
-            state,
-            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
-            review_deadline_hours=_DEFAULT_REVIEW_DEADLINE_HOURS,
-            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
-        )
-
-        call_args = mock_interrupt.call_args  # type: ignore[union-attr]
-        escalation_data = call_args[0][0]
-
-        assert "escalated_cves" in escalation_data
-        assert "escalation_timestamp" in escalation_data
-        assert "review_deadline" in escalation_data
-        assert "summary" in escalation_data
-        assert "CVE-2024-2222" in escalation_data["escalated_cves"]
-        assert isinstance(escalation_data["summary"], list)
-        assert len(escalation_data["summary"]) == 1
-        assert escalation_data["summary"][0]["cve_id"] == "CVE-2024-2222"
-
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_human_decision_approve(
-        self,
-        mock_interrupt: object,
-        mock_classification_low_confidence: ClassificationResult,
-    ) -> None:
-        """Test processing of 'approve' human decision after interrupt."""
-        mock_interrupt.return_value = {"decision": "approve"}  # type: ignore[union-attr]
-
+        """The returned state carries the review-tracking metadata used downstream."""
         state = {
             **create_initial_state(),
             "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
@@ -180,73 +148,38 @@ class TestEscalateNode:
             threshold_config=_DEFAULT_THRESHOLD_CONFIG,
         )
 
-        assert result["human_decision"] == "approve"
+        assert "CVE-2024-2222" in result["escalated_cves"]
+        assert result["escalation_timestamp"] is not None
+        assert result["review_deadline"] is not None
+        assert result["escalation_level"] in (0, 1, 2, 3)
+
+    def test_escalate_node_leaves_human_decision_unset(
+        self,
+        mock_classification_low_confidence: ClassificationResult,
+    ) -> None:
+        """Human decisions are applied out-of-band; the node initializes them to None."""
+        state = {
+            **create_initial_state(),
+            "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
+            "llm_confidence": {"CVE-2024-2222": 0.4},
+        }
+
+        result = escalate_node(
+            state,
+            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
+            review_deadline_hours=_DEFAULT_REVIEW_DEADLINE_HOURS,
+            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
+        )
+
+        assert result["human_decision"] is None
         assert result["human_modified_score"] is None
         assert result["human_modified_recommendation"] is None
 
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_human_decision_reject(
-        self,
-        mock_interrupt: object,
-        mock_classification_low_confidence: ClassificationResult,
-    ) -> None:
-        """Test processing of 'reject' human decision after interrupt."""
-        mock_interrupt.return_value = {"decision": "reject"}  # type: ignore[union-attr]
-
-        state = {
-            **create_initial_state(),
-            "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
-            "llm_confidence": {"CVE-2024-2222": 0.4},
-        }
-
-        result = escalate_node(
-            state,
-            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
-            review_deadline_hours=_DEFAULT_REVIEW_DEADLINE_HOURS,
-            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
-        )
-
-        assert result["human_decision"] == "reject"
-
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_human_decision_modify(
-        self,
-        mock_interrupt: object,
-        mock_classification_low_confidence: ClassificationResult,
-    ) -> None:
-        """Test processing of 'modify' human decision with overrides."""
-        mock_interrupt.return_value = {  # type: ignore[union-attr]
-            "decision": "modify",
-            "modified_score": 0.75,
-            "modified_recommendation": "Patch immediately",
-        }
-
-        state = {
-            **create_initial_state(),
-            "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
-            "llm_confidence": {"CVE-2024-2222": 0.4},
-        }
-
-        result = escalate_node(
-            state,
-            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
-            review_deadline_hours=_DEFAULT_REVIEW_DEADLINE_HOURS,
-            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
-        )
-
-        assert result["human_decision"] == "modify"
-        assert result["human_modified_score"] == 0.75
-        assert result["human_modified_recommendation"] == "Patch immediately"
-
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
     def test_escalation_timestamp_and_deadline_set(
         self,
-        mock_interrupt: object,
         mock_classification_low_confidence: ClassificationResult,
     ) -> None:
         """Test that escalation_timestamp and review_deadline are set correctly."""
-        mock_interrupt.return_value = {"decision": "approve"}  # type: ignore[union-attr]
-
         state = {
             **create_initial_state(),
             "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
@@ -269,15 +202,11 @@ class TestEscalateNode:
         delta = dl - ts
         assert timedelta(hours=23, minutes=59) <= delta <= timedelta(hours=24, minutes=1)
 
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
     def test_escalate_node_missing_risk_score_escalates(
         self,
-        mock_interrupt: object,
         mock_classification_no_score: ClassificationResult,
     ) -> None:
         """Test escalate node escalates CVE with missing risk score."""
-        mock_interrupt.return_value = {"decision": "approve"}  # type: ignore[union-attr]
-
         state = {
             **create_initial_state(),
             "classifications": {"CVE-2024-3333": mock_classification_no_score},
@@ -293,33 +222,6 @@ class TestEscalateNode:
 
         assert result["escalation_required"] is True
         assert "CVE-2024-3333" in result["escalated_cves"]
-        mock_interrupt.assert_called_once()  # type: ignore[union-attr]
-
-    @patch("siopv.application.orchestration.nodes.escalate_node.interrupt")
-    def test_escalate_node_non_dict_response_defaults_to_approve(
-        self,
-        mock_interrupt: object,
-        mock_classification_low_confidence: ClassificationResult,
-    ) -> None:
-        """Test that a non-dict interrupt response defaults to 'approve'."""
-        mock_interrupt.return_value = "approve"  # type: ignore[union-attr]
-
-        state = {
-            **create_initial_state(),
-            "classifications": {"CVE-2024-2222": mock_classification_low_confidence},
-            "llm_confidence": {"CVE-2024-2222": 0.4},
-        }
-
-        result = escalate_node(
-            state,
-            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
-            review_deadline_hours=_DEFAULT_REVIEW_DEADLINE_HOURS,
-            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
-        )
-
-        assert result["human_decision"] == "approve"
-        assert result["human_modified_score"] is None
-        assert result["human_modified_recommendation"] is None
 
 
 class TestCalculateEscalationLevel:
@@ -511,8 +413,12 @@ class TestEscalateNodeErrorBranches:
         with pytest.raises(ValueError, match="level_thresholds must be provided"):
             _calculate_escalation_level(now.isoformat(), level_thresholds=None)
 
-    def test_review_deadline_hours_none_raises_value_error(self) -> None:
-        """Test escalate_node raises when review_deadline_hours is None and candidates exist."""
+    def test_review_deadline_hours_none_yields_null_deadline(self) -> None:
+        """review_deadline_hours=None yields a null deadline; escalation still proceeds.
+
+        The non-blocking redesign no longer raises when the deadline is unset — the
+        review_deadline is simply omitted (None) while the CVE is still flagged.
+        """
         classification = ClassificationResult(
             cve_id="CVE-2024-2222",
             risk_score=RiskScore.from_prediction(cve_id="CVE-2024-2222", probability=0.9),
@@ -523,13 +429,16 @@ class TestEscalateNodeErrorBranches:
             "llm_confidence": {"CVE-2024-2222": 0.4},
         }
 
-        with pytest.raises(ValueError, match="review_deadline_hours must be provided"):
-            escalate_node(
-                state,
-                level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
-                review_deadline_hours=None,
-                threshold_config=_DEFAULT_THRESHOLD_CONFIG,
-            )
+        result = escalate_node(
+            state,
+            level_thresholds=_DEFAULT_LEVEL_THRESHOLDS,
+            review_deadline_hours=None,
+            threshold_config=_DEFAULT_THRESHOLD_CONFIG,
+        )
+
+        assert result["escalation_required"] is True
+        assert result["review_deadline"] is None
+        assert result["escalation_timestamp"] is not None
 
     def test_identify_candidates_exception_returns_empty(self) -> None:
         """Test escalate_node returns empty escalation on internal exception."""
@@ -557,3 +466,42 @@ class TestEscalateNodeErrorBranches:
         assert result["escalated_cves"] == []
         assert result["escalation_required"] is False
         assert any("Escalation analysis failed" in e for e in result["errors"])
+
+
+class TestBuildEscalationSummary:
+    """Tests for the _build_escalation_summary helper.
+
+    Retained from the original interrupt-payload design; still present in the
+    module (see project rule: orphaned-but-implemented code is investigated, not
+    deleted) and exercised here so its behavior stays covered and documented.
+    """
+
+    def test_summary_with_risk_score(self) -> None:
+        """A classified CVE yields ml_score, confidence and their discrepancy."""
+        classification = ClassificationResult(
+            cve_id="CVE-2024-2222",
+            risk_score=RiskScore.from_prediction(cve_id="CVE-2024-2222", probability=0.9),
+        )
+        summaries = _build_escalation_summary(
+            ["CVE-2024-2222"],
+            {"CVE-2024-2222": classification},
+            {"CVE-2024-2222": 0.4},
+        )
+
+        assert len(summaries) == 1
+        entry = summaries[0]
+        assert entry["cve_id"] == "CVE-2024-2222"
+        assert entry["ml_score"] == pytest.approx(0.9)
+        assert entry["llm_confidence"] == pytest.approx(0.4)
+        assert entry["discrepancy"] == pytest.approx(0.5)
+
+    def test_summary_missing_classification_defaults_to_zero(self) -> None:
+        """An escalated CVE absent from classifications defaults ml_score to 0.0."""
+        summaries = _build_escalation_summary(["CVE-2024-9999"], {}, {})
+
+        assert len(summaries) == 1
+        entry = summaries[0]
+        assert entry["cve_id"] == "CVE-2024-9999"
+        assert entry["ml_score"] == 0.0
+        assert entry["llm_confidence"] == 0.0
+        assert entry["discrepancy"] == 0.0

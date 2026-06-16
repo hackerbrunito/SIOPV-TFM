@@ -97,6 +97,9 @@ def sample_feature_vector() -> MLFeatureVector:
         epss_percentile=0.999,
         days_since_publication=1000,
         has_exploit_ref=1,
+        has_public_exploit=1,
+        has_metasploit=1,
+        num_references=8,
         cwe_category=0.78,
     )
 
@@ -119,6 +122,9 @@ def sample_shap_values() -> SHAPValues:
             "epss_percentile",
             "days_since_publication",
             "has_exploit_ref",
+            "has_public_exploit",
+            "has_metasploit",
+            "num_references",
             "cwe_category",
         ],
         shap_values=[
@@ -135,6 +141,9 @@ def sample_shap_values() -> SHAPValues:
             0.10,
             -0.02,
             0.12,
+            0.07,
+            0.06,
+            0.09,
             0.03,
         ],
         base_value=0.35,
@@ -196,8 +205,8 @@ class TestSHAPValues:
 
     def test_create_shap_values(self, sample_shap_values: SHAPValues):
         """Test creating SHAP values."""
-        assert len(sample_shap_values.feature_names) == 14
-        assert len(sample_shap_values.shap_values) == 14
+        assert len(sample_shap_values.feature_names) == 17
+        assert len(sample_shap_values.shap_values) == 17
         assert sample_shap_values.base_value == 0.35
 
     def test_to_dict(self, sample_shap_values: SHAPValues):
@@ -353,21 +362,21 @@ class TestMLFeatureVector:
         """Test converting to numpy array."""
         arr = sample_feature_vector.to_array()
         assert isinstance(arr, np.ndarray)
-        assert arr.shape == (14,)
+        assert arr.shape == (17,)
         assert arr[0] == 10.0  # cvss_base_score
         assert arr[9] == 0.975  # epss_score
 
     def test_to_dict(self, sample_feature_vector: MLFeatureVector):
         """Test converting to dictionary."""
         d = sample_feature_vector.to_dict()
-        assert len(d) == 14
+        assert len(d) == 17
         assert d["cvss_base_score"] == 10.0
         assert abs(d["epss_score"] - 0.975) < 1e-3  # Float32 precision
 
     def test_feature_names(self, sample_feature_vector: MLFeatureVector):
         """Test feature names property."""
         names = sample_feature_vector.feature_names
-        assert len(names) == 14
+        assert len(names) == 17
         assert "cvss_base_score" in names
         assert "epss_score" in names
 

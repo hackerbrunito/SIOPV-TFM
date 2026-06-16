@@ -36,6 +36,9 @@ def feature_names() -> list[str]:
         "epss_percentile",
         "days_since_publication",
         "has_exploit_ref",
+        "has_public_exploit",
+        "has_metasploit",
+        "num_references",
         "cwe_category",
     ]
 
@@ -58,6 +61,9 @@ def sample_feature_vector() -> MLFeatureVector:
         epss_percentile=0.999,
         days_since_publication=1000,
         has_exploit_ref=1,
+        has_public_exploit=1,
+        has_metasploit=1,
+        num_references=8,
         cwe_category=0.78,
     )
 
@@ -77,7 +83,7 @@ def predict_fn():
 def training_data() -> np.ndarray:
     """Create sample training data."""
     np.random.seed(42)
-    return np.random.randn(100, 14)
+    return np.random.randn(100, 17)
 
 
 @pytest.fixture
@@ -281,6 +287,9 @@ class TestLIMEExplainerExplanations:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(3)
@@ -327,6 +336,9 @@ class TestLIMEExplainerExplanations:
                 epss_percentile=0.95,
                 days_since_publication=500,
                 has_exploit_ref=1,
+                has_public_exploit=1,
+                has_metasploit=1,
+                num_references=8,
                 cwe_category=0.78,
             )
             for i in range(3)
@@ -412,7 +424,7 @@ class TestLIMEExplainerFactory:
         )
 
         # Call predict_fn
-        X = np.random.randn(2, 14)
+        X = np.random.randn(2, 17)
         predictions = explainer._predict_fn(X)
 
         assert predictions.shape == (2, 2)
@@ -609,6 +621,9 @@ class TestLIMEExplainerIntegration:
             epss_percentile=0.999,
             days_since_publication=1000,
             has_exploit_ref=1,
+            has_public_exploit=1,
+            has_metasploit=1,
+            num_references=8,
             cwe_category=0.78,
         )
 
@@ -669,6 +684,9 @@ class TestLIMEExplainerIntegration:
             epss_percentile=0.999,
             days_since_publication=1000,
             has_exploit_ref=1,
+            has_public_exploit=1,
+            has_metasploit=1,
+            num_references=8,
             cwe_category=0.78,
         )
 

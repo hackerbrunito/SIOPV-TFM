@@ -280,8 +280,11 @@ def test_settings_circuit_breaker_custom() -> None:
 def test_settings_claude_model_defaults() -> None:
     """Test Claude model defaults."""
     # Arrange & Act
+    # _env_file=None isolates this test from the developer's local .env (which may
+    # override the model IDs, e.g. for an Ollama setup) so it verifies the
+    # built-in code defaults, which is the intent of this test.
     with patch.dict(os.environ, {"SIOPV_ANTHROPIC_API_KEY": "test-key"}, clear=True):
-        settings = Settings()
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     # Assert
     assert settings.claude_haiku_model == "claude-haiku-4-5-20251001"

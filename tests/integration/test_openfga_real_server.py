@@ -18,7 +18,9 @@ Run with: pytest -m real_openfga tests/integration/test_openfga_real_server.py -
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import AsyncIterator
+from urllib.parse import urlparse
 
 import pytest
 
@@ -26,12 +28,33 @@ from siopv.adapters.authorization.openfga_adapter import OpenFGAAdapter
 from siopv.domain.authorization import Relation, RelationshipTuple, ResourceType, UserId
 from siopv.infrastructure.config.settings import Settings
 
-# Auto-skip mechanism when server unavailable
+# Auto-skip mechanism when no real server is available. Checking only whether
+# SIOPV_OPENFGA_API_URL is *set* is insufficient — it is set in .env by default
+# (localhost:8080), so these tests would run and fail whenever that server is
+# down. Probe actual TCP reachability so the suite skips (not fails) without one.
 OPENFGA_API_URL = os.getenv("SIOPV_OPENFGA_API_URL")
+_REACHABILITY_TIMEOUT_SECONDS = 1.0
+
+
+def _openfga_server_reachable(url: str | None) -> bool:
+    """Return True only if a TCP connection to the OpenFGA host:port succeeds."""
+    if not url:
+        return False
+    parsed = urlparse(url)
+    host = parsed.hostname
+    if not host:
+        return False
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        with socket.create_connection((host, port), timeout=_REACHABILITY_TIMEOUT_SECONDS):
+            return True
+    except OSError:
+        return False
+
 
 pytestmark = pytest.mark.skipif(
-    not OPENFGA_API_URL,
-    reason="SIOPV_OPENFGA_API_URL not set - real OpenFGA server not available",
+    not _openfga_server_reachable(OPENFGA_API_URL),
+    reason="real OpenFGA server not reachable - integration tests skipped",
 )
 
 
