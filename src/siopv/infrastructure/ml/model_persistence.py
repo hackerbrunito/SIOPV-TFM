@@ -363,6 +363,112 @@ class ModelPersistence:
 
         return model, metadata
 
+    # === Flat single-file persistence (settings.model_path layout) ===
+
+    def save_model_file(
+        self,
+        model: object,
+        model_path: str | Path,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> Path:
+        """Save a model to a single file with an integrity sidecar.
+
+        Companion to the versioned ``save_model_with_metadata`` for the flat
+        ``settings.model_path`` layout (``<model>.json`` next to
+        ``<model>.metadata.json``). Writes a SHA-256 hash of the model bytes into
+        the sidecar metadata, plus an HMAC-SHA256 signature when a signing key is
+        configured.
+
+        Args:
+            model: Model object exposing ``save_model(path)`` (e.g. XGBClassifier).
+            model_path: Destination file path for the model.
+            metadata: Caller-owned metadata; integrity fields are merged in.
+
+        Returns:
+            Path to the saved model file.
+        """
+        model_path = Path(model_path)
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # model typed as object; xgboost.XGBClassifier.save_model exists at runtime
+        model.save_model(str(model_path))  # type: ignore[attr-defined]
+
+        model_hash = _compute_file_hash(model_path)
+        sidecar: dict[str, Any] = dict(metadata or {})
+        sidecar["model_hash"] = model_hash
+        sidecar["hash_algorithm"] = "sha256"
+        if self._signing_key:
+            sidecar["model_signature"] = _compute_hmac_signature(
+                model_hash.encode(), self._signing_key
+            )
+            sidecar["signature_algorithm"] = "hmac-sha256"
+
+        metadata_path = model_path.with_suffix(".metadata.json")
+        with metadata_path.open("w") as f:
+            json.dump(sidecar, f, indent=2)
+
+        logger.info(
+            "model_file_saved",
+            model_path=str(model_path),
+            model_hash=model_hash[:16] + "...",
+            signed="model_signature" in sidecar,
+        )
+        return model_path
+
+    def verify_model_file(self, model_path: str | Path) -> dict[str, Any]:
+        """Verify the integrity of a single-file model before it is loaded.
+
+        Enforces the size limit, then verifies the SHA-256 hash (and HMAC
+        signature when a signing key is configured) against the sidecar
+        ``<model>.metadata.json``. Does NOT load the model into memory — callers
+        load the file only after this returns without raising.
+
+        Args:
+            model_path: Path to the model file to verify.
+
+        Returns:
+            The sidecar metadata (empty dict if no sidecar is present).
+
+        Raises:
+            FileNotFoundError: If the model file does not exist.
+            IntegrityError: If the file exceeds the size limit or fails hash /
+                signature verification.
+        """
+        model_path = Path(model_path)
+        if not model_path.exists():
+            msg = f"Model file not found: {model_path}"
+            raise FileNotFoundError(msg)
+
+        file_size = model_path.stat().st_size
+        if file_size > self._max_model_size:
+            msg = f"Model file exceeds maximum allowed size ({self._max_model_size} bytes)"
+            raise IntegrityError(
+                msg,
+                details={
+                    "file_size": file_size,
+                    "max_size": self._max_model_size,
+                    "model_path": str(model_path),
+                },
+            )
+
+        metadata_path = model_path.with_suffix(".metadata.json")
+        metadata: dict[str, Any] = {}
+        if metadata_path.exists():
+            with metadata_path.open() as f:
+                metadata = json.load(f)
+
+        if "model_hash" in metadata:
+            self._verify_model_integrity(model_path, metadata)
+        else:
+            logger.warning(
+                "model_integrity_unverified",
+                model_path=str(model_path),
+                reason="no integrity hash in sidecar metadata",
+            )
+
+        return metadata
+
     def list_models(self) -> list[dict[str, Any]]:
         """List all available models with their versions.
 

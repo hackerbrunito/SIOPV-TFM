@@ -162,7 +162,8 @@ class Settings(BaseSettings):
 
     # === ML Model ===
     model_path: Path = Path("./models/xgboost_risk_model.json")
-    # Defined for configurability. Wiring to ML loader is a future task.
+    # Consumed by build_classifier -> ModelPersistence to verify the model
+    # artifact (size + SHA-256 hash + HMAC signature) before loading it (S9 / M-01).
     model_base_path: Path = Path("./models")
     model_max_size_bytes: int = 104_857_600  # 100MB
     model_signing_key: SecretStr | None = None  # HMAC key for model integrity
@@ -187,6 +188,35 @@ class Settings(BaseSettings):
     webhook_secret: SecretStr | None = None
     webhook_host: str = "0.0.0.0"
     webhook_port: int = 8080
+    webhook_max_body_bytes: int = 10_485_760  # 10 MB — reject larger payloads (HTTP 413)
+    webhook_rate_limit_rpm: int = 30  # per-IP requests per minute (HTTP 429)
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> Self:
+        """Fail-safe: require security-critical secrets in production.
+
+        Only enforces secrets that are actually wired to a security control:
+
+        - ``webhook_secret`` gates HMAC verification of the webhook, an
+          unauthenticated remote trigger when enabled, so it is mandatory in
+          production once the webhook is on.
+        - ``model_signing_key`` gates HMAC verification of the ML model artifact
+          on load (build_classifier -> ModelPersistence.verify_model_file), so it
+          is mandatory in production to guarantee model authenticity (S9 / M-01).
+        """
+        if self.environment == "production" and self.webhook_enabled and not self.webhook_secret:
+            msg = (
+                "SIOPV_ENVIRONMENT=production with SIOPV_WEBHOOK_ENABLED=true "
+                "requires SIOPV_WEBHOOK_SECRET to be set"
+            )
+            raise ValueError(msg)
+        if self.environment == "production" and not self.model_signing_key:
+            msg = (
+                "SIOPV_ENVIRONMENT=production requires SIOPV_MODEL_SIGNING_KEY to be "
+                "set (HMAC signing of the ML model artifact)"
+            )
+            raise ValueError(msg)
+        return self
 
     # === Defaults (CLI overrides) ===
     default_user_id: str | None = None

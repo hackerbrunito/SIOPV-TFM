@@ -45,6 +45,8 @@ TRIVY_PAYLOAD = {
 HTTP_202 = 202
 HTTP_400 = 400
 HTTP_401 = 401
+HTTP_413 = 413
+HTTP_429 = 429
 
 
 def _sign_payload(payload: bytes, secret: str) -> str:
@@ -52,17 +54,28 @@ def _sign_payload(payload: bytes, secret: str) -> str:
     return "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
 
+TEST_MAX_BODY_BYTES = 1_048_576  # 1 MB cap for tests
+TEST_RATE_LIMIT_RPM = 600  # generous so functional tests are not throttled
+
+
 @pytest.fixture
 def webhook_receiver(tmp_path: Path) -> TrivyWebhookReceiver:
     return TrivyWebhookReceiver(
         secret=SecretStr(SHARED_SECRET),
         output_dir=tmp_path,
+        max_body_bytes=TEST_MAX_BODY_BYTES,
+        rate_limit_rpm=TEST_RATE_LIMIT_RPM,
     )
 
 
 @pytest.fixture
 def webhook_receiver_no_secret(tmp_path: Path) -> TrivyWebhookReceiver:
-    return TrivyWebhookReceiver(secret=None, output_dir=tmp_path)
+    return TrivyWebhookReceiver(
+        secret=None,
+        output_dir=tmp_path,
+        max_body_bytes=TEST_MAX_BODY_BYTES,
+        rate_limit_rpm=TEST_RATE_LIMIT_RPM,
+    )
 
 
 @pytest.fixture
@@ -78,6 +91,37 @@ def client_no_secret(webhook_receiver_no_secret: TrivyWebhookReceiver) -> TestCl
     app = FastAPI()
     app.include_router(router)
     set_webhook_receiver(webhook_receiver_no_secret)
+    return TestClient(app)
+
+
+SMALL_BODY_CAP = 100  # bytes — below the TRIVY_PAYLOAD size, to exercise 413
+
+
+@pytest.fixture
+def client_small_cap(tmp_path: Path) -> TestClient:
+    receiver = TrivyWebhookReceiver(
+        secret=None,
+        output_dir=tmp_path,
+        max_body_bytes=SMALL_BODY_CAP,
+        rate_limit_rpm=TEST_RATE_LIMIT_RPM,
+    )
+    app = FastAPI()
+    app.include_router(router)
+    set_webhook_receiver(receiver)
+    return TestClient(app)
+
+
+@pytest.fixture
+def client_strict_rate(tmp_path: Path) -> TestClient:
+    receiver = TrivyWebhookReceiver(
+        secret=None,
+        output_dir=tmp_path,
+        max_body_bytes=TEST_MAX_BODY_BYTES,
+        rate_limit_rpm=1,  # one request, then throttle
+    )
+    app = FastAPI()
+    app.include_router(router)
+    set_webhook_receiver(receiver)
     return TestClient(app)
 
 
@@ -224,3 +268,45 @@ class TestWebhookEndpoint:
                 headers={"Content-Type": "application/json"},
             )
         assert resp.status_code == HTTP_202
+
+    def test_oversized_content_length_returns_413(self, client_small_cap: TestClient) -> None:
+        # Body larger than SMALL_BODY_CAP; httpx sets Content-Length, hitting the precheck
+        body = json.dumps(TRIVY_PAYLOAD).encode()
+        assert len(body) > SMALL_BODY_CAP
+        resp = client_small_cap.post(
+            "/api/v1/webhook/trivy",
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == HTTP_413
+
+    def test_oversized_streamed_body_returns_413(self, client_small_cap: TestClient) -> None:
+        # Chunked transfer (generator) sends no Content-Length, exercising the
+        # streaming cap rather than the Content-Length precheck.
+        payload = b"x" * (SMALL_BODY_CAP * 4)
+        chunks = (payload[i : i + 32] for i in range(0, len(payload), 32))
+        resp = client_small_cap.post(
+            "/api/v1/webhook/trivy",
+            content=chunks,
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == HTTP_413
+
+    def test_rate_limit_returns_429(self, client_strict_rate: TestClient) -> None:
+        body = json.dumps(TRIVY_PAYLOAD).encode()
+        with patch(
+            "siopv.adapters.inbound.webhook_adapter._run_pipeline_background",
+            new_callable=AsyncMock,
+        ):
+            first = client_strict_rate.post(
+                "/api/v1/webhook/trivy",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            second = client_strict_rate.post(
+                "/api/v1/webhook/trivy",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+        assert first.status_code == HTTP_202
+        assert second.status_code == HTTP_429

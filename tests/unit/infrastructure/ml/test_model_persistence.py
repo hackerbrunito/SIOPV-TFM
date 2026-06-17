@@ -789,3 +789,133 @@ class TestModelPersistenceIntegration:
 
         assert loaded_model is loaded_mock
         assert "model_signature" in metadata
+
+
+# === Flat single-file persistence (settings.model_path layout) ===
+
+
+class TestFlatFilePersistence:
+    """Tests for save_model_file / verify_model_file (S9 / Wave 1.5)."""
+
+    def test_save_model_file_writes_model_and_sidecar(
+        self, model_persistence: ModelPersistence, mock_model: Mock, temp_base_path: Path
+    ):
+        """save_model_file writes the model and a hash sidecar next to it."""
+        model_path = temp_base_path / "risk_model.json"
+
+        returned = model_persistence.save_model_file(
+            mock_model, model_path, metadata={"version": "1.0.0"}
+        )
+
+        assert returned == model_path
+        assert model_path.exists()
+        sidecar = model_path.with_suffix(".metadata.json")
+        assert sidecar.exists()
+        meta = json.loads(sidecar.read_text())
+        assert meta["version"] == "1.0.0"
+        assert meta["hash_algorithm"] == "sha256"
+        assert meta["model_hash"] == _compute_file_hash(model_path)
+        # No signing key configured -> no signature fields
+        assert "model_signature" not in meta
+
+    def test_save_model_file_signs_when_key_configured(
+        self,
+        model_persistence_with_signing: ModelPersistence,
+        mock_model: Mock,
+        temp_base_path: Path,
+    ):
+        """With a signing key, the sidecar carries an HMAC signature."""
+        model_path = temp_base_path / "risk_model.json"
+
+        model_persistence_with_signing.save_model_file(mock_model, model_path)
+
+        meta = json.loads(model_path.with_suffix(".metadata.json").read_text())
+        assert meta["signature_algorithm"] == "hmac-sha256"
+        assert meta["model_signature"] == _compute_hmac_signature(
+            meta["model_hash"].encode(), "test-secret-key"
+        )
+
+    def test_verify_model_file_roundtrip_ok(
+        self, model_persistence: ModelPersistence, mock_model: Mock, temp_base_path: Path
+    ):
+        """A freshly saved model verifies cleanly and returns its metadata."""
+        model_path = temp_base_path / "risk_model.json"
+        model_persistence.save_model_file(mock_model, model_path, metadata={"version": "2.0.0"})
+
+        meta = model_persistence.verify_model_file(model_path)
+
+        assert meta["version"] == "2.0.0"
+        assert meta["model_hash"] == _compute_file_hash(model_path)
+
+    def test_verify_model_file_signed_roundtrip_ok(
+        self,
+        model_persistence_with_signing: ModelPersistence,
+        mock_model: Mock,
+        temp_base_path: Path,
+    ):
+        """A signed model verifies its HMAC signature without raising."""
+        model_path = temp_base_path / "risk_model.json"
+        model_persistence_with_signing.save_model_file(mock_model, model_path)
+
+        meta = model_persistence_with_signing.verify_model_file(model_path)
+
+        assert "model_signature" in meta
+
+    def test_verify_model_file_missing_file_raises(
+        self, model_persistence: ModelPersistence, temp_base_path: Path
+    ):
+        """Verifying a non-existent file raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            model_persistence.verify_model_file(temp_base_path / "absent.json")
+
+    def test_verify_model_file_tampered_hash_raises(
+        self, model_persistence: ModelPersistence, mock_model: Mock, temp_base_path: Path
+    ):
+        """A byte-flipped model fails hash verification (fail-closed)."""
+        model_path = temp_base_path / "risk_model.json"
+        model_persistence.save_model_file(mock_model, model_path)
+
+        # Tamper with the model bytes after signing
+        model_path.write_text(model_path.read_text() + " ")
+
+        with pytest.raises(IntegrityError, match="hash mismatch"):
+            model_persistence.verify_model_file(model_path)
+
+    def test_verify_model_file_tampered_signature_raises(
+        self,
+        model_persistence_with_signing: ModelPersistence,
+        mock_model: Mock,
+        temp_base_path: Path,
+    ):
+        """A forged signature (valid hash, wrong HMAC) is rejected."""
+        model_path = temp_base_path / "risk_model.json"
+        model_persistence_with_signing.save_model_file(mock_model, model_path)
+
+        sidecar = model_path.with_suffix(".metadata.json")
+        meta = json.loads(sidecar.read_text())
+        meta["model_signature"] = "0" * 64  # wrong signature, hash still valid
+        sidecar.write_text(json.dumps(meta))
+
+        with pytest.raises(IntegrityError, match="signature verification failed"):
+            model_persistence_with_signing.verify_model_file(model_path)
+
+    def test_verify_model_file_oversize_raises(self, mock_model: Mock, temp_base_path: Path):
+        """A model larger than the configured limit is rejected before loading."""
+        persistence = ModelPersistence(base_path=temp_base_path, max_model_size=10)
+        model_path = temp_base_path / "risk_model.json"
+        persistence.save_model_file(mock_model, model_path)
+
+        with pytest.raises(IntegrityError, match="exceeds maximum allowed size"):
+            persistence.verify_model_file(model_path)
+
+    def test_verify_model_file_no_sidecar_warns_and_returns_empty(
+        self, model_persistence: ModelPersistence, mock_model: Mock, temp_base_path: Path
+    ):
+        """Without a sidecar, verification cannot run: returns {} (no raise)."""
+        model_path = temp_base_path / "risk_model.json"
+        model_persistence.save_model_file(mock_model, model_path)
+        model_path.with_suffix(".metadata.json").unlink()
+
+        meta = model_persistence.verify_model_file(model_path)
+
+        assert meta == {}

@@ -5,6 +5,12 @@ default_stages: [pre-commit]
 fail_fast: false
 
 repos:
+  # Gitleaks - Detect hardcoded secrets before they reach git history
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
   # Ruff - Fast Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0

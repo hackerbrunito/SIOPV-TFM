@@ -49,6 +49,8 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
+from siopv.infrastructure.ml.model_persistence import ModelPersistence
+
 logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -653,10 +655,13 @@ def train_exploitation_model(
 
 
 def save_model(model: XGBClassifier, metrics: dict[str, Any]) -> Path:
-    """Save model and metadata to models/."""
-    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    model.save_model(str(MODEL_PATH))
+    """Save model with signed integrity metadata to models/.
 
+    Writes the model plus a sidecar ``<model>.metadata.json`` carrying a SHA-256
+    integrity hash, and an HMAC-SHA256 signature when SIOPV_MODEL_SIGNING_KEY is
+    set in the environment. The runtime loader (build_classifier) verifies these
+    before trusting the model (S9 / M-01).
+    """
     metadata = {
         "model_name": "xgboost_risk_model",
         "trained_at": datetime.now(UTC).isoformat(),
@@ -667,11 +672,19 @@ def save_model(model: XGBClassifier, metrics: dict[str, Any]) -> Path:
         "metrics": metrics,
     }
 
-    metadata_path = MODEL_PATH.with_suffix(".metadata.json")
-    metadata_path.write_text(json.dumps(metadata, indent=2))
+    signing_key = os.environ.get("SIOPV_MODEL_SIGNING_KEY")
+    persistence = ModelPersistence(base_path=MODEL_PATH.parent, signing_key=signing_key)
+    persistence.save_model_file(model, MODEL_PATH, metadata=metadata)
 
+    metadata_path = MODEL_PATH.with_suffix(".metadata.json")
     print(f"  Model saved: {MODEL_PATH} ({MODEL_PATH.stat().st_size} bytes)")
     print(f"  Metadata saved: {metadata_path}")
+    if signing_key:
+        print("  Model signed: HMAC-SHA256 (SIOPV_MODEL_SIGNING_KEY)")
+    else:
+        print(
+            "  WARNING: SIOPV_MODEL_SIGNING_KEY not set -- model saved unsigned (SHA-256 hash only)"
+        )
 
     return MODEL_PATH
 

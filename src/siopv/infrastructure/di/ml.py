@@ -16,6 +16,8 @@ from siopv.adapters.ml.xgboost_classifier import XGBoostClassifier
 from siopv.application.ports.feature_engineering import FeatureEngineerPort
 from siopv.application.ports.ml_classifier import MLClassifierPort
 from siopv.application.ports.parsing import TrivyParserPort
+from siopv.domain.exceptions import IntegrityError, PathTraversalError
+from siopv.infrastructure.ml.model_persistence import ModelPersistence
 
 if TYPE_CHECKING:
     from siopv.infrastructure.config import Settings
@@ -50,6 +52,29 @@ def build_classifier(settings: Settings) -> MLClassifierPort | None:
             "classifier_skipped",
             reason="model file not found",
             model_path=str(model_path),
+        )
+        return None
+
+    # Integrity gate (S9 / M-01): verify the model artifact — size, SHA-256 hash,
+    # and HMAC signature (when SIOPV_MODEL_SIGNING_KEY is set) — before loading it.
+    # A tampered/oversized artifact fails closed: the classifier is skipped and
+    # the pipeline degrades to its no-ML fallback rather than trusting a poisoned model.
+    signing_key = (
+        settings.model_signing_key.get_secret_value() if settings.model_signing_key else None
+    )
+    persistence = ModelPersistence(
+        base_path=settings.model_base_path,
+        signing_key=signing_key,
+        max_model_size=settings.model_max_size_bytes,
+    )
+    try:
+        persistence.verify_model_file(model_path)
+    except (IntegrityError, PathTraversalError) as exc:
+        logger.exception(
+            "classifier_skipped",
+            reason="model integrity verification failed",
+            model_path=str(model_path),
+            error=str(exc),
         )
         return None
 

@@ -45,6 +45,7 @@ def test_settings_defaults() -> None:
     assert settings.log_level == "INFO"
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_from_env() -> None:
     """Test Settings loads from environment variables with SIOPV_ prefix."""
     # Arrange
@@ -52,6 +53,7 @@ def test_settings_from_env() -> None:
         "SIOPV_ANTHROPIC_API_KEY": "sk-ant-test123",
         "SIOPV_APP_NAME": "CustomSIOPV",
         "SIOPV_ENVIRONMENT": "production",
+        "SIOPV_MODEL_SIGNING_KEY": "test-model-signing-key",
         "SIOPV_DEBUG": "true",
         "SIOPV_LOG_LEVEL": "DEBUG",
     }
@@ -277,6 +279,7 @@ def test_settings_circuit_breaker_custom() -> None:
 # === Claude Model Configuration Tests ===
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_claude_model_defaults() -> None:
     """Test Claude model defaults."""
     # Arrange & Act
@@ -312,12 +315,14 @@ def test_settings_claude_models_custom() -> None:
 # === Environment Validation Tests ===
 
 
+@pytest.mark.usefixtures("settings_no_env_file")
 def test_settings_environment_literal_validation() -> None:
     """Test environment accepts only valid literals."""
     # Arrange
     env_vars = {
         "SIOPV_ANTHROPIC_API_KEY": "test-key",
         "SIOPV_ENVIRONMENT": "production",
+        "SIOPV_MODEL_SIGNING_KEY": "test-model-signing-key",
     }
 
     # Act
@@ -621,3 +626,134 @@ def test_settings_openfga_auth_method_client_credentials_missing_all_raises() ->
         pytest.raises(ValidationError, match=expected_match),
     ):
         Settings()
+
+
+# === Production Secret Validation Tests ===
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_production_webhook_enabled_without_secret_raises() -> None:
+    """Production with webhook enabled but no secret must fail (fail-safe)."""
+    expected_match = "requires SIOPV_WEBHOOK_SECRET to be set"
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_ENVIRONMENT": "production",
+                "SIOPV_WEBHOOK_ENABLED": "true",
+            },
+            clear=True,
+        ),
+        pytest.raises(ValidationError, match=expected_match),
+    ):
+        Settings()
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_production_webhook_enabled_with_secret_ok() -> None:
+    """Production with webhook enabled and a secret set must pass."""
+    with patch.dict(
+        os.environ,
+        {
+            "SIOPV_ANTHROPIC_API_KEY": "test-key",
+            "SIOPV_ENVIRONMENT": "production",
+            "SIOPV_WEBHOOK_ENABLED": "true",
+            "SIOPV_WEBHOOK_SECRET": "super-secret",
+            "SIOPV_MODEL_SIGNING_KEY": "test-model-signing-key",
+        },
+        clear=True,
+    ):
+        settings = Settings()
+
+    assert settings.webhook_secret is not None
+    assert settings.webhook_secret.get_secret_value() == "super-secret"
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_production_webhook_disabled_without_secret_ok() -> None:
+    """Production without the webhook enabled does not require a webhook secret."""
+    with patch.dict(
+        os.environ,
+        {
+            "SIOPV_ANTHROPIC_API_KEY": "test-key",
+            "SIOPV_ENVIRONMENT": "production",
+            "SIOPV_MODEL_SIGNING_KEY": "test-model-signing-key",
+        },
+        clear=True,
+    ):
+        settings = Settings()
+
+    assert settings.environment == "production"
+    assert settings.webhook_enabled is False
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_production_without_model_signing_key_raises() -> None:
+    """Production must fail-safe when the model signing key is absent (S5 / S9)."""
+    expected_match = "requires SIOPV_MODEL_SIGNING_KEY to be"
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "SIOPV_ANTHROPIC_API_KEY": "test-key",
+                "SIOPV_ENVIRONMENT": "production",
+            },
+            clear=True,
+        ),
+        pytest.raises(ValidationError, match=expected_match),
+    ):
+        Settings()
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_production_with_model_signing_key_ok() -> None:
+    """Production with the model signing key set must pass and expose the key."""
+    with patch.dict(
+        os.environ,
+        {
+            "SIOPV_ANTHROPIC_API_KEY": "test-key",
+            "SIOPV_ENVIRONMENT": "production",
+            "SIOPV_MODEL_SIGNING_KEY": "test-model-signing-key",
+        },
+        clear=True,
+    ):
+        settings = Settings()
+
+    assert settings.model_signing_key is not None
+    assert settings.model_signing_key.get_secret_value() == "test-model-signing-key"
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_development_without_model_signing_key_ok() -> None:
+    """Non-production environments never require a model signing key."""
+    with patch.dict(
+        os.environ,
+        {
+            "SIOPV_ANTHROPIC_API_KEY": "test-key",
+            "SIOPV_ENVIRONMENT": "development",
+        },
+        clear=True,
+    ):
+        settings = Settings()
+
+    assert settings.environment == "development"
+    assert settings.model_signing_key is None
+
+
+@pytest.mark.usefixtures("settings_no_env_file")
+def test_settings_development_webhook_enabled_without_secret_ok() -> None:
+    """Non-production environments never require a webhook secret."""
+    with patch.dict(
+        os.environ,
+        {
+            "SIOPV_ANTHROPIC_API_KEY": "test-key",
+            "SIOPV_ENVIRONMENT": "development",
+            "SIOPV_WEBHOOK_ENABLED": "true",
+        },
+        clear=True,
+    ):
+        settings = Settings()
+
+    assert settings.environment == "development"
+    assert settings.webhook_secret is None

@@ -1,0 +1,21 @@
+# Gitleaks configuration for SIOPV
+# https://github.com/gitleaks/gitleaks
+#
+# Extends the default ruleset and allowlists paths that only ever contain
+# non-production, dummy/example credentials:
+#   - tests/          test fixtures and intentional dummy auth tokens (JWTs,
+#                     HMAC keys, SBOM hashes) used by the test suite
+#   - .claude/        internal development tooling and research docs; excluded
+#                     from the public repository entirely
+#
+# Real credentials live only in the untracked .env file (never committed).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test code/fixtures and internal tooling docs hold only dummy/example secrets"
+paths = [
+  '''tests/.*''',
+  '''\.claude/.*''',
+]

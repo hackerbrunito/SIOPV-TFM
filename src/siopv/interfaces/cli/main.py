@@ -304,7 +304,7 @@ def train_model(
     typer.echo(f"Loading dataset: {dataset_path}")
 
     # Load CSV with headers matching MLFeatureVector fields.
-    # Required columns: cve_id + 14 feature columns + label (last column).
+    # Required columns: cve_id + 17 feature columns + label (last column).
     # The last column must be the label (1=exploited, 0=not exploited).
     features: list[MLFeatureVector] = []
     labels: list[int] = []
@@ -338,6 +338,9 @@ def train_model(
                 epss_percentile=float(feature_data["epss_percentile"]),
                 days_since_publication=int(float(feature_data["days_since_publication"])),
                 has_exploit_ref=int(float(feature_data["has_exploit_ref"])),
+                has_public_exploit=int(float(feature_data["has_public_exploit"])),
+                has_metasploit=int(float(feature_data["has_metasploit"])),
+                num_references=int(float(feature_data["num_references"])),
                 cwe_category=float(feature_data["cwe_category"]),
             )
             features.append(fv)

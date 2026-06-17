@@ -27,6 +27,8 @@ def build_webhook_receiver(settings: Settings) -> WebhookReceiverPort:
     adapter = TrivyWebhookReceiver(
         secret=settings.webhook_secret,
         output_dir=settings.output_dir,
+        max_body_bytes=settings.webhook_max_body_bytes,
+        rate_limit_rpm=settings.webhook_rate_limit_rpm,
     )
     logger.info(
         "webhook_receiver_created",

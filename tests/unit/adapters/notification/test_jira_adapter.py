@@ -484,6 +484,17 @@ class TestFindTicketByCve:
         with pytest.raises(JiraIntegrationError, match="timeout"):
             await adapter.find_ticket_by_cve("CVE-2021-44228")
 
+    @pytest.mark.asyncio
+    async def test_invalid_cve_id_returns_none_without_query(
+        self, adapter: JiraAdapter, mock_client: AsyncMock
+    ) -> None:
+        # JQL injection attempt via a malformed CVE ID must be rejected before
+        # any JQL is built or any request is made.
+        malicious = 'CVE-2021-44228" OR labels = "x'
+        result = await adapter.find_ticket_by_cve(malicious)
+        assert result is None
+        mock_client.get.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # _handle_rescan tests

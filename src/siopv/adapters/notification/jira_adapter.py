@@ -15,6 +15,7 @@ import structlog
 
 from siopv.application.ports.jira_client import JiraClientPort
 from siopv.domain.exceptions import JiraIntegrationError
+from siopv.domain.value_objects import validate_cve_id
 from siopv.infrastructure.types import JsonDict
 
 if TYPE_CHECKING:
@@ -532,6 +533,14 @@ class JiraAdapter(JiraClientPort):
         Raises:
             JiraIntegrationError: On API errors during search
         """
+        # Validate CVE ID format before interpolating into JQL to prevent
+        # injection via a malformed/attacker-controlled identifier.
+        try:
+            cve_id = validate_cve_id(cve_id)
+        except ValueError:
+            logger.warning("jira_search_invalid_cve_id", cve_id=cve_id)
+            return None
+
         client = await self._get_client()
         # Use exact phrase match with quotes around CVE ID to prevent
         # partial matches (e.g., CVE-2019-1008 matching CVE-2019-10082)

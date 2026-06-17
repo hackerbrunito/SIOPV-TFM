@@ -6,6 +6,7 @@ Tests factory functions for creating ML classification adapters:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -65,6 +66,33 @@ class TestBuildClassifier:
             model_path=settings_with_model.model_path,
             environment=settings_with_model.environment,
         )
+
+    @patch("siopv.infrastructure.di.ml.XGBoostClassifier")
+    def test_returns_none_when_model_tampered(self, mock_cls: object, tmp_path: Path) -> None:
+        """A model whose bytes don't match its hash sidecar fails closed (S9)."""
+        model_file = tmp_path / "xgboost_risk_model.json"
+        model_file.write_text('{"learner": {}}')
+        # Sidecar with a hash that does NOT match the file -> IntegrityError
+        sidecar = model_file.with_suffix(".metadata.json")
+        sidecar.write_text(json.dumps({"model_hash": "deadbeef", "hash_algorithm": "sha256"}))
+        settings = Settings(model_path=model_file)
+
+        classifier = build_classifier(settings)
+
+        assert classifier is None
+        mock_cls.assert_not_called()  # type: ignore[attr-defined]
+
+    @patch("siopv.infrastructure.di.ml.XGBoostClassifier")
+    def test_returns_none_when_model_oversize(self, mock_cls: object, tmp_path: Path) -> None:
+        """A model larger than the configured limit fails closed (S9)."""
+        model_file = tmp_path / "xgboost_risk_model.json"
+        model_file.write_text("x" * 50)
+        settings = Settings(model_path=model_file, model_max_size_bytes=10)
+
+        classifier = build_classifier(settings)
+
+        assert classifier is None
+        mock_cls.assert_not_called()  # type: ignore[attr-defined]
 
 
 # === Test exports ===

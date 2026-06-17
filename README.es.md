@@ -130,7 +130,7 @@ interfaces/      — punto de entrada CLI, dashboard Streamlit
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/hackerbrunito/SIOPV-TFM.git
+git clone https://github.com/cvs72/SIOPV-TFM.git
 cd SIOPV-TFM
 ```
 
